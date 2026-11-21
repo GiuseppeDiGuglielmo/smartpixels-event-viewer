@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SENSOR, DEFAULT_STATE, pixelAt, pixelCenter, traceParticle, illustrativeWeight,
+  SENSOR, DEFAULT_STATE, pixelAt, pixelCenter, traceParticle,
 } from '../src/geometry.js';
 
 const close = (actual, expected, tolerance = 1e-10) => {
@@ -69,11 +69,3 @@ test('default demonstration has a top-surface hit', () => {
   assert.equal(traceParticle(DEFAULT_STATE).hit, true);
 });
 
-test('illustrative cluster is bounded, decreases with distance, and clips out of bounds', () => {
-  const impact = pixelCenter(12, 23);
-  const near = illustrativeWeight(12, 23, impact);
-  const far = illustrativeWeight(15, 30, impact);
-  assert.ok(near > far);
-  assert.ok(near <= 1);
-  assert.equal(illustrativeWeight(-1, 23, impact), 0);
-});

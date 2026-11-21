@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import {
   SENSOR, point, traceParticle, intersectVolume, traversedPixels,
-  roiWindow, roiBounds, roiContains, progressAtZ, pointAtProgress, illustrativeWeight,
+  roiWindow, roiBounds, roiContains, progressAtZ, pointAtProgress,
 } from './geometry.js';
 import {
   SCENE_SCALE, toScene, fromScene, cameraDirection, anglesFromDirection,
@@ -308,7 +308,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     const traversedSet = new Set(traversed.map((p) => p.y * SENSOR.pixelsX + p.x));
     const shading = pixelShading(s);
     const dataCharge = shading === 'charge' ? s.charge : null;
-    const gaussWindow = trace.topPixel ? { x0: trace.topPixel.x - 4, x1: trace.topPixel.x + 5, y0: trace.topPixel.y - 10, y1: trace.topPixel.y + 11 } : null;
     for (let iy = 0; iy < SENSOR.pixelsY; iy++) {
       for (let ix = 0; ix < SENSOR.pixelsX; ix++) {
         const i = iy * SENSOR.pixelsX + ix;
@@ -327,9 +326,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         if (q > 0) {
           [r, g, b] = chargeColor(q, dataCharge.scale);
           a = 245;
-        } else if (shading === 'gaussian' && gaussWindow && ix >= gaussWindow.x0 && ix < gaussWindow.x1 && iy >= gaussWindow.y0 && iy < gaussWindow.y1) {
-          const w = illustrativeWeight(ix, iy, trace.top);
-          if (w > 0.03) blend(134, 232, 168, Math.min(0.95, 0.2 + 0.8 * w), 150 + 100 * w);
         }
         texData[i * 4] = r; texData[i * 4 + 1] = g; texData[i * 4 + 2] = b; texData[i * 4 + 3] = a;
       }
@@ -399,7 +395,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
 
   function buildTrack() {
     const s = state();
-    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showRoi, s.roiMode, s.showGaussian,
+    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showRoi, s.roiMode,
       s.showTraversed, s.showLabels, s.showGrid, s.showMid, s.mode, s.charge?.key, s.showChargeBars].join('|');
     if (key === trackKey) return false;
     trackKey = key;

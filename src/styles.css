@@ -19,7 +19,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:16px;max-width:1
 .roi-wrap{align-items:flex-start}.roi-wrap canvas{width:150px;height:159px}
 @media(max-width:640px){.scene-webgl{height:380px}.metric.wide2{grid-column:span 2}}
 .bottom-grid{grid-template-columns:minmax(0,1fr) 340px}.roi-wrap canvas{width:180px;height:191px;max-width:55%}.roi-wrap p{max-width:none}@media(max-width:990px){.bottom-grid{grid-template-columns:minmax(0,1fr) 320px}}@media(max-width:640px){.bottom-grid{grid-template-columns:1fr}}
-.dot.gauss{background:#86e8a8}.dot.side{background:#e879c9}
+.dot.side{background:#e879c9}
 /* ---- pixelAV data mode ---- */
 .data-status{font-size:11px;color:var(--muted);margin:8px 0 0;min-height:1em}.data-status.ok{color:#9fe6c0}.data-status.error{color:#ffb38a}
 .event-nav>div{display:flex;gap:4px}.event-nav button{flex:1;margin-top:0;min-width:0;padding:8px 0}
@@ -28,3 +28,12 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:16px;max-width:1
 body[data-mode^="data"] .demo-only{display:none}body:not([data-mode="data"]) .data-only{display:none}
 .event-panel{margin-top:16px}.event-panel .results{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:640px){.event-panel .results{grid-template-columns:1fr 1fr}}
 .scene-label.charge{color:#fde68a;border-color:#8a7a2f}
+/* ---- 2D pixel map ---- */
+.view-switch{display:flex;gap:0;border:1px solid #426079;border-radius:8px;overflow:hidden}.view-switch button{border:0;border-radius:0;min-height:30px;padding:5px 12px;background:#0f2034}.view-switch button[aria-pressed="true"]{background:#155e72;color:#fff}
+.map2d{width:100%;height:525px;display:block;cursor:crosshair}.map2d:focus-visible{outline:2px solid var(--cyan);outline-offset:-5px}
+.canvas-frame:not([data-view="2d"]) .map2d,.canvas-frame:not([data-view="2d"]) .map-hover{display:none}
+.canvas-frame[data-view="2d"] .scene-webgl,.canvas-frame[data-view="2d"] .scene-labels,.canvas-frame[data-view="2d"] #scene,.canvas-frame[data-view="2d"] .overlay{display:none!important} /* three.js sets an inline display on its canvas */
+.map-hover{position:absolute;left:66px;top:12px;pointer-events:none;font:600 11px/1.3 ui-monospace,monospace;color:#d5e9fb;background:#081625d9;border:1px solid #2e4b62;border-radius:6px;padding:5px 8px;white-space:pre;z-index:2}.map-hover:empty{display:none}
+body[data-view="3d"] .map-only{display:none}.map-note{font-weight:500;color:var(--muted);font-size:11px}
+.dot.centroid{background:#fde68a;border-radius:1px;transform:rotate(45deg) scale(.85)}
+@media(max-width:640px){.map2d{height:420px}}

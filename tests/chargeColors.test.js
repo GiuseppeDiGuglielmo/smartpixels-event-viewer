@@ -23,10 +23,10 @@ test('ramp endpoints and CSS legend', () => {
 
 import { pixelShading } from '../src/chargeColors.js';
 
-test('pad shading never mixes simulated charge with the illustrative Gaussian', () => {
+test('pads are coloured only by loaded pixelAV charge', () => {
   const charge = { dense: new Float32Array(9216), scale: 1 };
-  assert.equal(pixelShading({ mode: 'data', charge, showGaussian: true }), 'charge');
-  assert.equal(pixelShading({ mode: 'data', charge: null, showGaussian: true }), 'none');
-  assert.equal(pixelShading({ mode: 'demo', charge, showGaussian: true }), 'gaussian');
-  assert.equal(pixelShading({ mode: 'demo', charge: null, showGaussian: false }), 'none');
+  assert.equal(pixelShading({ mode: 'data', charge }), 'charge');
+  assert.equal(pixelShading({ mode: 'data', charge: null }), 'none');
+  assert.equal(pixelShading({ mode: 'demo', charge }), 'none');
+  assert.equal(pixelShading({ mode: 'demo', charge: null }), 'none');
 });

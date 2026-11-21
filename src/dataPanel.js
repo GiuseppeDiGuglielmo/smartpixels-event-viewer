@@ -3,8 +3,8 @@
  * simulated-event readout. Loads events lazily through eventSource.js (one
  * HTTP Range request per event, small LRU caches) — never whole files.
  *
- * Simulated charge and the illustrative Gaussian are never shown together:
- * entering data mode hides the Gaussian and every label says "pixelAV simulated".
+ * Charge is shown only in data mode, and every label there says "pixelAV
+ * simulated"; demo mode is geometry only.
  */
 import { createEventSource } from './eventSource.js';
 import {
@@ -180,12 +180,9 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     if (state.mode === 'data') return;
     demoStash = {
       ...Object.fromEntries(PARTICLE_KEYS.map((k) => [k, state[k]])),
-      showGaussian: state.showGaussian,
       preset: el('preset').value,
     };
     state.mode = 'data';
-    state.showGaussian = false;
-    el('gaussToggle').checked = false;
     el('dataControls').hidden = false;
     lockParticleInputs(true);
     const params = new URLSearchParams(location.search);
@@ -205,8 +202,6 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     lockParticleInputs(false);
     if (demoStash) {
       for (const k of PARTICLE_KEYS) { state[k] = demoStash[k]; el(k).value = String(state[k]); }
-      state.showGaussian = demoStash.showGaussian;
-      el('gaussToggle').checked = state.showGaussian;
       el('preset').value = demoStash.preset;
     }
     state.progress = 1;
@@ -216,7 +211,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
   }
 
   function lockParticleInputs(locked) {
-    for (const id of ['x0', 'y0', 'thetaX', 'thetaY', 'preset', 'gaussToggle']) {
+    for (const id of ['x0', 'y0', 'thetaX', 'thetaY', 'preset']) {
       el(id).disabled = locked;
       el(id).title = locked ? 'Set by the pixelAV truth of the loaded event' : '';
     }

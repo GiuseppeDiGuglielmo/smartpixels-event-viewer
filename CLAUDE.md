@@ -18,7 +18,7 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 - Particle starts at `(x0,y0,z0)`, with `z0 > 0` (above sensor). Define angles as independent slopes: `x(z) = x0 + (z0-z)*tan(thetaX)`, `y(z) = y0 + (z0-z)*tan(thetaY)`.
 - Zero-based pixel coordinates: X 0..47, Y 0..191. Do not silently transpose axes or pixels.
 - Visual Z stretch is rendering only. All computations use physical µm.
-- Current Gaussian pixel brightness is illustrative only; do not describe it as physical charge transport.
+- Demo mode is geometry only: the illustrative Gaussian was removed (v0.4.0). Do not add a made-up pixel response; the only charge shown is pixelAV simulated data.
 - Do not quietly replace top-surface-hit semantics. If you add side entry / volume intersection, separate it clearly and test it.
 
 ## Code organization
@@ -28,7 +28,8 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 - `src/renderer3d.js`: Three.js (WebGL) renderer; draws only what geometry.js returns.
 - `src/renderer.js`: legacy 2D-canvas renderer (fallback, `?renderer=2d`); keep physical coordinates distinct from projected coordinates.
 - `src/roiPanel.js`: 16 × 16 ROI index-space panel.
-- `src/pixelav.js`, `src/eventSource.js`, `src/dataPanel.js`: pixelAV simulated-event mode (decoder + mapping, Range loader, UI). Simulated charge stays separate from the illustrative Gaussian.
+- `src/pixelMap2d.js`: 2D top-view pixel map (3D/2D switch): pure layout/marker/label helpers plus canvas drawing. Tested in `tests/pixelMap2d.test.js`.
+- `src/pixelav.js`, `src/eventSource.js`, `src/dataPanel.js`: pixelAV simulated-event mode (decoder + mapping, Range loader, UI). Charge colours come only from loaded simulated events (`pixelShading`).
 - `scripts/pixelav_convert.py`: Parquet → sparse converter (Python + pyarrow, e.g. conda env `pixelav-env`). Format and conventions: `docs/PIXELAV_DATA.md`.
 - `vendor/three/`: unmodified Three.js r187 (MIT), loaded via the import map in index.html. No npm install.
 - `src/main.js`: UI state, input validation, animation, interaction.
@@ -40,7 +41,7 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 
 - Prefer incremental, working changes with a short explanation of what changed.
 - If migrating to Three.js, keep `src/geometry.js` and tests. Explicitly document the rendering dependency and update the run instructions.
-- If introducing real charge simulation, keep the physically simulated output and the illustrative demo mode separate in the UI.
+- If introducing real charge simulation, keep the physically simulated output and the geometric demo mode separate in the UI.
 - Support Linux and local development with minimal setup; the current app uses Node 20+ and no npm packages (Three.js is vendored).
 - Run `npm test` after edits. A change that only alters screenshots does not validate correct detector geometry.
 - Prioritize a polished, accurate, interactive visualization for talks and demos.

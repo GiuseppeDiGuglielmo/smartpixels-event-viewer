@@ -108,15 +108,6 @@ export function traceParticle({ x0, y0, z0, thetaX, thetaY }) {
   };
 }
 
-/** Purely illustrative, unitless 2D pixel brightness near surface impact. */
-export function illustrativeWeight(pixelX, pixelY, impact, sigmaX = 43, sigmaY = 22) {
-  const center = pixelCenter(pixelX, pixelY);
-  if (!center || !impact) return 0;
-  const xDistance = (center.x - impact.x) / sigmaX;
-  const yDistance = (center.y - impact.y) / sigmaY;
-  return Math.exp(-0.5 * (xDistance ** 2 + yDistance ** 2));
-}
-
 /* ------------------------------------------------------------------------ *
  * Region of interest (ROI), animation parameterisation, and full-volume
  * intersection. All pure functions in physical µm / zero-based indices.

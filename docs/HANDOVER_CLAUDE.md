@@ -12,6 +12,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 |---|---|---|
 | 1. Three.js volumetric viewer (rotate/zoom, editable track, top/mid/exit animation, 16×16 ROI) | Done, reviewed | `README.md`, `docs/PROJECT_SPEC.md` |
 | 2. pixelAV simulated events (Parquet → sparse files, one event per HTTP Range request) | Done, reviewed | `docs/PIXELAV_DATA.md` |
+| 3. Illustrative Gaussian removed; 2D pixel map with surface/midplane/exit markers (v0.4.0) | Done | `README.md` ("2D pixel map") |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
 1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
@@ -36,7 +37,7 @@ The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the projec
 
 | File | Role | Edit it? |
 |---|---|---|
-| `CLAUDE.md` | **Project rules**: geometry constants, axis and pixel conventions, the "Gaussian is illustrative" rule, code organisation. This is the most important file for keeping the agent honest. | Yes, whenever conventions or layout change. Keep it short and checkable. |
+| `CLAUDE.md` | **Project rules**: geometry constants, axis and pixel conventions, the "no made-up pixel response" rule, code organisation. This is the most important file for keeping the agent honest. | Yes, whenever conventions or layout change. Keep it short and checkable. |
 | `.claude/CLAUDE.md` | OMC's orchestration instructions, between `<!-- OMC:START -->` markers. OMC installed it project-locally. | No. `omc-setup` regenerates it. |
 | `.claude/skills/wiki/` | OMC's project-local wiki skill | Leave as is |
 
@@ -95,14 +96,14 @@ When autopilot cannot get a human answer, it records each guess as an assumption
 
 ## 5. Prompting: what worked
 
-- **Name the constraint, not just the feature.** For example: "keep `src/geometry.js` the source of truth", "simulated charge must never be mixed with the Gaussian", "don't transpose pixels".
+- **Name the constraint, not just the feature.** For example: "keep `src/geometry.js` the source of truth", "only pixelAV data may colour pixels", "don't transpose pixels".
 - **Ask for evidence when the data's conventions are unknown.** Milestone 2 derived the pixel column order, the coordinate frame and the origin from the data itself, using correlations and residuals, and wrote the evidence down. Insist on that rather than plausible guesses.
 - **Ask for browser QA, not only unit tests.** The rapid-click race in event stepping was found only by driving the real UI.
 - Example opening prompt for a new session:
 
   > Read CLAUDE.md, README.md, docs/PIXELAV_DATA.md and docs/HANDOVER_CLAUDE.md. Run `npm test`.
   > Then add event filtering by cotα/cotβ/pT using the truth columns already in each file's index (no new downloads).
-  > Keep simulated vs illustrative separation, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
+  > Keep simulated data separate from the geometric demo, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
 
 ## 6. How to check the agent's work
 
@@ -126,7 +127,7 @@ Then compare against the guardrails in `CLAUDE.md`:
 - the slope formulas;
 - zero-based pixel indices, no transpose;
 - Z stretch is display-only;
-- the Gaussian is labelled illustrative.
+- only pixelAV simulated charge colours pixels (demo mode is geometry only).
 
 A change that only alters screenshots does not prove the geometry is correct.
 

@@ -1,6 +1,6 @@
 import {
   SENSOR, clamp, degreesToRadians as deg, point, lerp,
-  traceParticle, illustrativeWeight,
+  traceParticle,
 } from './geometry.js';
 import { chargeColor, pixelShading } from './chargeColors.js';
 
@@ -202,21 +202,6 @@ export function createRenderer({ canvas, getState }) {
         const x = -H + (indices[i] % SENSOR.pixelsX) * px;
         const y = -K + Math.floor(indices[i] / SENSOR.pixelsX) * py;
         polygon([a(x, y, 0), a(x + px, y, 0), a(x + px, y + py, 0), a(x, y + py, 0)], `rgb(${r},${g},${b})`, null);
-      }
-    }
-
-    // Illustration only: Gaussian brightness is NOT a physical charge model.
-    if (shading === 'gaussian' && t.topPixel) {
-      for (let dx = -2; dx <= 2; dx++) {
-        for (let dy = -5; dy <= 5; dy++) {
-          const ix = t.topPixel.x + dx;
-          const iy = t.topPixel.y + dy;
-          const intensity = illustrativeWeight(ix, iy, t.top, 38, 22);
-          if (intensity < 0.035) continue;
-          const x = -H + ix * SENSOR.pitchX;
-          const y = -K + iy * SENSOR.pitchY;
-          polygon([a(x, y, 0), a(x + 50, y, 0), a(x + 50, y + 12.5, 0), a(x, y + 12.5, 0)], `rgba(88,238,233,${Math.min(0.9, 0.16 + 0.78 * intensity)})`, null);
-        }
       }
     }
 

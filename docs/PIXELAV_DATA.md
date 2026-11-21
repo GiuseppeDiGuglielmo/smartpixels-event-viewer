@@ -1,9 +1,10 @@
 # pixelAV simulated events in the viewer
 
-The viewer can show real **pixelAV simulated** events instead of the illustrative demo:
+The viewer can show real **pixelAV simulated** events instead of the geometric demo:
 - the truth straight track,
 - the collected charge per pixel (electrons), on the pads and as bars,
-- the charge's evolution over the 20 time slices.
+- the charge's evolution over the 20 time slices,
+- a 2D top-view pixel map of the charge, with markers for the surface impact, midplane crossing, exit and charge centroid.
 
 Source dataset used during development:
 
@@ -91,7 +92,7 @@ Data angles reach about ±84° (|cotα| up to about 9.8). The ±75° input limit
   - the bar heights (linear in charge, with the event's maximum shown as 400 µm of display height; this height is not a z coordinate),
   - the Z exaggeration,
   - the start height above the sensor (`z0`, which only moves the start point along the truth line).
-- **Illustrative (demo mode only):** the Gaussian footprint. It is never drawn together with simulated charge.
+- **Demo mode** has no pixel response at all (the illustrative Gaussian was removed in v0.4.0).
 - **Not interpreted:** columns such as `pt`, `y-local`, `offset1/2` and `*_atEdge` are shown as stored. From the data, `offset1` tracks y-midplane and `offset2` tracks x-midplane (r ≈ 0.98).
 
 ## Tests

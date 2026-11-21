@@ -4,8 +4,8 @@
  *
  * Data come from scripts/pixelav_convert.py (format "pixelav-sparse-v1").
  * Charge values are pixelAV SIMULATED electrons, cumulative over time slices.
- * This is real simulation output and is kept separate from the illustrative
- * Gaussian of the demo mode.
+ * This is real simulation output; it is the only charge the viewer shows
+ * (demo mode is geometry only).
  *
  * Coordinate conventions (verified on test/part.0, see docs/PIXELAV_DATA.md):
  *  - pixel index p = iy*48 + ix (same zero-based ix/iy as geometry.js; no transpose)

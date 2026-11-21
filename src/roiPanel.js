@@ -1,14 +1,14 @@
-import { ROI_SIZE, SENSOR, illustrativeWeight } from './geometry.js';
+import { ROI_SIZE, SENSOR } from './geometry.js';
 import { chargeColor, pixelShading } from './chargeColors.js';
 
 /**
  * Draws the 16 × 16 ROI index-space panel. Cells are square for inspection
  * (physically each is 50 × 12.5 µm). +x to the right, +y UP, matching the
- * 3D top view. Demo mode: brightness is the illustrative Gaussian, not charge.
- * Data mode (`charge` given): colour is pixelAV SIMULATED charge (log scale).
+ * 3D top view. Data mode (`charge` given): colour is pixelAV SIMULATED
+ * charge (log scale). Demo mode: plain cells, geometric overlays only.
  */
-export function drawRoiPanel(canvas, { trace, roi, traversed = [], showGaussian = true, charge = null, mode = charge ? 'data' : 'demo' }) {
-  const shading = pixelShading({ mode, charge, showGaussian });
+export function drawRoiPanel(canvas, { trace, roi, traversed = [], charge = null, mode = charge ? 'data' : 'demo' }) {
+  const shading = pixelShading({ mode, charge });
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const w = canvas.width;
@@ -48,9 +48,7 @@ export function drawRoiPanel(canvas, { trace, roi, traversed = [], showGaussian 
         ctx.fillRect(cellX(ix), cellY(iy), step - 0.8, step - 0.8);
         continue;
       }
-      const weight = shading === 'gaussian' && trace.hit ? illustrativeWeight(ix, iy, trace.top) : 0;
-      const alpha = 0.14 + 0.84 * weight;
-      ctx.fillStyle = `rgba(${Math.round(30 + 104 * weight)},${Math.round(82 + 150 * weight)},${Math.round(126 + 42 * weight)},${alpha})`;
+      ctx.fillStyle = 'rgba(30,82,126,0.14)';
       ctx.fillRect(cellX(ix), cellY(iy), step - 0.8, step - 0.8);
     }
   }

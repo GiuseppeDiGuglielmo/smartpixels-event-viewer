@@ -38,12 +38,10 @@ export const RAMP_CSS = `linear-gradient(90deg, ${STOPS.map(([p, c]) => `rgb(${c
 
 /**
  * Single rule for what colours the pixel pads, shared by every renderer:
- *  - data mode with a loaded event → 'charge' (pixelAV simulated)
- *  - data mode without an event    → 'none'   (never fall back to the Gaussian)
- *  - demo mode                     → 'gaussian' if enabled, else 'none'
- * Simulated charge and the illustrative Gaussian can therefore never be mixed.
+ * pixelAV SIMULATED charge in data mode once an event is loaded, otherwise
+ * nothing. There is no illustrative pixel response any more, so the pads never
+ * show anything that could be mistaken for charge.
  */
-export function pixelShading({ mode, charge, showGaussian }) {
-  if (mode === 'data') return charge ? 'charge' : 'none';
-  return showGaussian ? 'gaussian' : 'none';
+export function pixelShading({ mode, charge }) {
+  return mode === 'data' && charge ? 'charge' : 'none';
 }

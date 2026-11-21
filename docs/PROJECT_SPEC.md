@@ -44,15 +44,16 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 - Control particle origin and direction; presets.
 - Orbit, pan and zoom camera (OrbitControls), synced with the sliders and keyboard. View presets: top, side X–Z, side Y–Z, focus impact, reset.
 - Play, pause, loop and seek the particle path. Top impact, midplane crossing and exit markers, with their pixels, appear as the particle reaches each plane.
-- 16 × 16 ROI toggle (centered or aligned tile); pixels crossed by the track; illustrative Gaussian toggle; label toggle.
+- 16 × 16 ROI toggle (centered or aligned tile); pixels crossed by the track; label toggle.
+- 2D pixel map (true-aspect top view of the whole array) with toggleable markers for the top-surface impact, midplane crossing and exit, a hover readout, and a choice between "around the track" and full-sensor framing (v0.4.0).
 - Readouts: top/mid/bottom positions and pixel addresses, volume entry→exit faces and chord, number of pixels crossed.
-- PNG export of the 3D canvas.
+- PNG export of the current view (3D scene or 2D map).
 
 ## 4. Visual and physics assumptions
 
 The 3D view uses Three.js with a perspective camera. Physical µm are mapped to scene units only in `src/sceneTransform.js`: `(x, z·stretch, −y)·0.01`, a proper rotation with no mirroring. Z is exaggerated to improve readability, and this affects the display only.
 
-No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Pixel brightness comes from an arbitrary Gaussian centered at the extrapolated *surface* point. This should never be reported as charge in electrons without replacing it with real response data.
+No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Demo mode does not shade pixels by any charge model; the illustrative Gaussian was removed in v0.4.0. Charge is shown only from pixelAV simulated events (data mode).
 
 ## 5. Future feature proposals (not implemented)
 

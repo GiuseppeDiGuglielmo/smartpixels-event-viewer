@@ -4,21 +4,30 @@ import {
 import { PRESETS } from './presets.js';
 import { createRenderer } from './renderer.js';
 import { drawRoiPanel } from './roiPanel.js';
+import { drawPixelMap, pickPixel, MAP_FITS } from './pixelMap2d.js';
 import { createDataPanel, DATA_DEFAULTS } from './dataPanel.js';
 
 const el = (id) => document.getElementById(id);
 const frame = el('frame');
 const legacyCanvas = el('scene');
 const roiCanvas = el('roi');
+const mapCanvas = el('map2d');
 
 // Display-only options live here, not in geometry.js.
 const VIEW_DEFAULTS = Object.freeze({
   showRoi: false,
   roiMode: 'centered',
-  showGaussian: true,
   showTraversed: true,
   showLabels: true,
   loop: false,
+  // 2D pixel map
+  view: '3d',
+  mapFit: 'track',
+  markTop: true,
+  markMid: true,
+  markExit: true,
+  markCentroid: true,
+  mapLabels: true,
 });
 const state = { ...DEFAULT_STATE, ...VIEW_DEFAULTS, ...DATA_DEFAULTS, animating: false };
 let ELEVATION_MIN = -89; // the legacy 2D fallback narrows this to 5..85
@@ -94,23 +103,115 @@ function updateReadout() {
     ? `Colour: pixelAV simulated charge at time slice ${state.charge.slice} (log scale, e⁻)`
     : state.mode === 'data'
       ? 'No pixelAV event loaded yet (no charge shown)'
-      : state.showGaussian ? 'Green: illustrative Gaussian (not charge)' : 'No pixel shading';
+      : 'Demo mode: no pixel shading (geometry only)';
   el('roiCaption').textContent = roi
     ? `ROI x ${roi.x0}–${roi.x1 - 1}, y ${roi.y0}–${roi.y1 - 1} (${state.roiMode === 'aligned' ? 'aligned tile' : 'centered on impact'}) = 800 × 200 µm. ${shading}; amber dots: pixels crossed by the track (geometric).`
     : 'No top-surface hit, so no ROI is defined.';
   // 'data' only once an event is loaded, so no text claims a truth track before then.
   document.body.dataset.mode = state.mode === 'data' ? (state.event ? 'data' : 'data-pending') : 'demo';
   drawRoiPanel(roiCanvas, {
-    trace: ray, roi, traversed, showGaussian: state.showGaussian,
+    trace: ray, roi, traversed,
     charge: dataMode ? state.charge : null,
     mode: state.mode,
   });
 }
 
+/* ---------------- 2D pixel map ---------------- */
+let mapTransformUsed = null;
+let mapHover = null;
+let mapPointer = null; // last pointer position over the map (CSS px), to re-pick after redraws
+
+function drawMap() {
+  const rect = mapCanvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.round(rect.width * dpr);
+  const h = Math.round(rect.height * dpr);
+  if (mapCanvas.width !== w || mapCanvas.height !== h) { mapCanvas.width = w; mapCanvas.height = h; }
+  const trace = traceParticle(state);
+  mapTransformUsed = drawPixelMap(mapCanvas.getContext('2d'), rect.width, rect.height, {
+    trace,
+    volume: intersectVolume(state),
+    traversed: traversedPixels(state),
+    roi: roiWindow(trace.topPixel, state.roiMode),
+    charge: state.mode === 'data' ? state.charge : null,
+    frameCharge: state.mode === 'data' && state.event ? { sparse: state.event.slices[state.event.slices.length - 1] } : null,
+    mode: state.mode,
+    progress: state.progress,
+    fit: state.mapFit,
+    hover: mapHover,
+    dpr,
+    show: {
+      grid: state.showGrid, traversed: state.showTraversed, roi: state.showRoi,
+      top: state.markTop, mid: state.markMid, exit: state.markExit,
+      centroid: state.markCentroid, labels: state.mapLabels,
+    },
+  });
+  // The window may have moved (new event, edited track): keep the hover on what is under the pointer now.
+  if (mapPointer && mapHover) {
+    const next = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
+    const moved = (next.pixel?.x !== mapHover.pixel?.x) || (next.pixel?.y !== mapHover.pixel?.y);
+    mapHover = next;
+    if (moved) { drawPixelMapAgain(); return; }
+  }
+  renderHover();
+}
+
+function drawPixelMapAgain() {
+  const keep = mapPointer;
+  mapPointer = null; // one extra redraw at most
+  drawMap();
+  mapPointer = keep;
+}
+
+function renderHover() {
+  const box = el('mapHover');
+  if (!mapHover) { box.textContent = ''; return; }
+  const { pixel, x, y } = mapHover;
+  if (!pixel) { box.textContent = `x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm · outside the sensor`; return; }
+  let text = `pixel (${pixel.x}, ${pixel.y}) · x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm`;
+  if (state.mode === 'data' && state.charge) {
+    const q = state.charge.dense[pixel.y * SENSOR.pixelsX + pixel.x];
+    text += `\npixelAV charge, slice ${state.charge.slice}: ${q ? `${Math.round(q * 10) / 10} e⁻` : '0 e⁻'}`;
+  }
+  box.textContent = text;
+}
+
+function setView(view) {
+  state.view = view === '2d' ? '2d' : '3d';
+  frame.dataset.view = state.view;
+  document.body.dataset.view = state.view;
+  el('view3d').setAttribute('aria-pressed', String(state.view === '3d'));
+  el('view2d').setAttribute('aria-pressed', String(state.view === '2d'));
+  el('viewTag').textContent = state.view === '2d' ? '2D pixel map' : '3D scene';
+  el('canvasTip').hidden = state.view === '2d'; // the 2D map has its own axes and hover box
+  el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
+  const cameraIds = ['azimuth', 'elevation', 'zStretch', 'viewTop', 'viewSideX', 'viewSideY', 'viewFocus', 'resetView'];
+  for (const id of cameraIds) {
+    if (id === 'viewFocus' && !renderer.setView) continue;
+    el(id).disabled = state.view === '2d';
+  }
+  // The legacy 2D-canvas renderer cannot draw these in 3D, but the 2D map can.
+  if (renderer.kind !== 'webgl') {
+    for (const id of ['roiToggle', 'roiMode', 'traversedToggle']) {
+      el(id).disabled = state.view !== '2d' || (id === 'roiMode' && !state.showRoi);
+      el(id).title = state.view === '2d' ? '' : 'Available in the WebGL (3D) view and the 2D map';
+    }
+  }
+  const params = new URLSearchParams(location.search);
+  if (state.view === '2d') params.set('view', '2d'); else params.delete('view');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`);
+  mapHover = null;
+  if (state.view === '3d') renderer.resize();
+  update();
+}
+
 function update() {
   syncCameraInputs();
   updateReadout();
-  renderer.render();
+  if (state.view === '2d') drawMap();
+  else renderer.render();
 }
 
 /* ---------------- animation ---------------- */
@@ -196,13 +297,15 @@ function bindControls() {
 
   for (const [id, key] of [
     ['gridToggle', 'showGrid'], ['midToggle', 'showMid'], ['roiToggle', 'showRoi'],
-    ['gaussToggle', 'showGaussian'], ['traversedToggle', 'showTraversed'],
+    ['traversedToggle', 'showTraversed'],
     ['labelsToggle', 'showLabels'], ['loopToggle', 'loop'],
+    ['markTop', 'markTop'], ['markMid', 'markMid'], ['markExit', 'markExit'],
+    ['markCentroid', 'markCentroid'], ['mapLabels', 'mapLabels'],
   ]) {
     el(id).checked = !!state[key];
     el(id).addEventListener('change', (event) => {
       state[key] = event.target.checked;
-      el('roiMode').disabled = !state.showRoi;
+      el('roiMode').disabled = !state.showRoi || (renderer.kind !== 'webgl' && state.view !== '2d');
       update();
     });
   }
@@ -212,6 +315,25 @@ function bindControls() {
     state.roiMode = event.target.value;
     update();
   });
+
+  el('mapFit').value = state.mapFit;
+  el('mapFit').addEventListener('change', (event) => {
+    state.mapFit = MAP_FITS.includes(event.target.value) ? event.target.value : 'track';
+    mapHover = null;
+    update();
+  });
+  el('view3d').addEventListener('click', () => setView('3d'));
+  el('view2d').addEventListener('click', () => setView('2d'));
+  mapCanvas.addEventListener('pointermove', (event) => {
+    if (!mapTransformUsed) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    mapPointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const next = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
+    const same = mapHover && next.pixel?.x === mapHover.pixel?.x && next.pixel?.y === mapHover.pixel?.y;
+    mapHover = next;
+    if (same) renderHover(); else drawMap();
+  });
+  mapCanvas.addEventListener('pointerleave', () => { mapHover = null; mapPointer = null; drawMap(); });
 
   el('preset').addEventListener('change', () => {
     const preset = PRESETS[el('preset').value];
@@ -256,10 +378,12 @@ function bindControls() {
     update();
   });
   el('savePng').addEventListener('click', () => {
-    const url = renderer.exportPNG ? renderer.exportPNG() : legacyCanvas.toDataURL('image/png');
+    const url = state.view === '2d'
+      ? mapCanvas.toDataURL('image/png')
+      : renderer.exportPNG ? renderer.exportPNG() : legacyCanvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pixel-sensor-x${state.x0}-y${state.y0}-tx${state.thetaX}-ty${state.thetaY}.png`;
+    link.download = `pixel-sensor-${state.view}-x${state.x0}-y${state.y0}-tx${state.thetaX}-ty${state.thetaY}.png`;
     link.click();
   });
 
@@ -267,6 +391,7 @@ function bindControls() {
   frame.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', ' '].includes(event.key)) return;
+    if (state.view === '2d' && event.key !== ' ') return; // the 2D map has no camera: leave keys to the page
     event.preventDefault();
     if (event.key === ' ') { play(); return; }
     const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180;
@@ -284,8 +409,9 @@ function bindControls() {
   if (renderer.kind !== 'webgl') bindLegacyPointer();
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
-  if ('ResizeObserver' in window) new ResizeObserver(() => renderer.resize()).observe(renderer.element);
-  else window.addEventListener('resize', () => renderer.resize());
+  const onResize = () => { if (state.view === '2d') drawMap(); else renderer.resize(); };
+  if ('ResizeObserver' in window) new ResizeObserver(onResize).observe(frame);
+  else window.addEventListener('resize', onResize);
 }
 
 function bindLegacyPointer() {
@@ -340,7 +466,7 @@ if (renderer.kind !== 'webgl') {
   }
 }
 renderer.resize();
-update();
+setView(new URLSearchParams(location.search).get('view') === '2d' ? '2d' : '3d');
 
 // Read-only diagnostics for the browser console / integration checks.
 // Not a stable API; import geometry.js directly in code.
@@ -355,4 +481,6 @@ window.pixelSensorDebug = Object.freeze({
   get charge() { return state.charge ? { slice: state.charge.slice, ...state.charge.stats, scale: state.charge.scale } : null; },
   get dataStats() { return dataPanel.source ? { ...dataPanel.source.stats, ...dataPanel.source.cacheSizes() } : null; },
   get geometry() { return SENSOR; },
+  get view() { return state.view; },
+  get mapWindow() { return mapTransformUsed ? { ...mapTransformUsed.visible, scale: mapTransformUsed.scale } : null; },
 });
