@@ -249,7 +249,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
   }
 
   function bind() {
-    el('chargeRamp').style.background = RAMP_CSS;
+    el('chargeRampLegend').style.background = RAMP_CSS;
     el('dataMode').addEventListener('change', (event) => (event.target.value === 'data' ? enterData() : enterDemo()));
     el('dataFile').addEventListener('change', () => loadEvent(Number(el('dataFile').value), 0));
     el('eventIndex').addEventListener('change', () => loadEvent(Number(el('dataFile').value), Number(el('eventIndex').value)));

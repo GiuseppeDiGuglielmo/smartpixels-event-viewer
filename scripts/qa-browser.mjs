@@ -8,7 +8,7 @@
 //
 // Each step runs, in this order: set (input values, fires change+input), check
 // (checkboxes), click (element id), wait (ms, default 600), js (expression,
-// printed), shot (PNG of the viewport area into <outdir>). Console messages and
+// printed), shot (PNG of the viewport panel into <outdir>). Console messages and
 // uncaught exceptions are printed at the end; the exit code is 1 if any
 // exception was thrown.
 // WebGL runs on SwiftShader, so no GPU is needed. CHROME=/path/to/chrome overrides the binary.
@@ -61,8 +61,11 @@ const evaluate = async (expression) => {
   const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
   return r.result?.result?.value ?? r.result?.exceptionDetails?.exception?.description;
 };
+// Screenshots cover the viewport panel (SHOT_SELECTOR overrides it, e.g. "body").
 const shot = async (name) => {
-  const r = await send('Page.captureScreenshot', { format: 'png', clip: { x: 26, y: 160, width: 1010, height: 720, scale: 1 } });
+  const sel = process.env.SHOT_SELECTOR ?? '.viewport-panel';
+  const rect = await evaluate(`(()=>{const r=document.querySelector(${q(sel)}).getBoundingClientRect();return {x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height};})()`);
+  const r = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { ...rect, scale: 1 } });
   writeFileSync(join(out, `${name}.png`), Buffer.from(r.result.data, 'base64'));
 };
 const q = JSON.stringify;
@@ -78,7 +81,8 @@ for (const step of steps) {
   for (const [k, v] of Object.entries(step.check ?? {})) {
     await evaluate(`(()=>{const e=document.getElementById(${q(k)});e.checked=${Boolean(v)};e.dispatchEvent(new Event('change'));})()`);
   }
-  if (step.click) await evaluate(`document.getElementById(${q(step.click)}).click()`);
+  // click: an element id, or a CSS selector (e.g. "#axisUnits [data-value=px]").
+  if (step.click) await evaluate(`(document.getElementById(${q(step.click)}) ?? document.querySelector(${q(step.click)})).click()`);
   await sleep(step.wait ?? 600);
   if (step.js) console.log(step.js.slice(0, 70), '=>', JSON.stringify(await evaluate(step.js)));
   if (step.shot) await shot(step.shot);

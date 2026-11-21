@@ -1,30 +1,28 @@
-# Autopilot spec — milestone 3: remove the Gaussian, add a 2D pixel map
+# Autopilot spec — milestone 4: 2D-first, full 48 × 192 map, simpler GUI, axis units
 
-Request (2026-11-21): "remove the illustrative gaussian code, and add a feature to show it in 2d? on the 2d
-there should be an option to highlight center of impact on the surface, midplane, and on the exit".
-User answers: 2D = pixel map in both modes; placement = 3D/2D toggle in the main viewport.
+Request (2026-11-21): "start with the 2D map (default), 3D later; it should be 48x192 pixels, right now it
+seems off, it seems that you zoomed it; improve and simplify the GUI (abstraction, discipline, hierarchy,
+modularity, regularity) in what it shows, buttons, toggles; a tick to mark axis dimensions in µm or pixels".
 
 ## Requirements
-1. Remove `illustrativeWeight` and every Gaussian path: geometry.js, renderer3d, legacy renderer, ROI panel,
-   pixelShading ('gaussian' state), the toggle, legend, captions, tests, docs. Demo mode becomes a purely
-   geometric demo (no pixel brightness). Data mode is unchanged.
-2. New 2D pixel map (top view, full 48 × 192 array, physical aspect: 2400 × 2400 µm square, so pixels look
-   50 × 12.5 µm). Shown in the main viewport via a 3D / 2D switch; the 3D renderer keeps its state.
-   - Data mode: pixels coloured by pixelAV simulated charge (same ramp, same slice/threshold state).
-   - Demo mode: no charge; geometric overlays only.
-   - Overlays: pixel grid (toggle), pixels crossed by track (toggle), ROI rectangle (toggle), the projected
-     in-silicon track segment, the particle position during the animation.
-   - Marker toggles (2D panel): top-surface impact (z = 0), midplane crossing (z = −50), exit (z = −100);
-     each draws the crossing point (x, y) and outlines its pixel; outside-sensor points are drawn hollow / noted.
-     Data mode adds an optional charge-centroid marker.
-   - View: "Full sensor" or "Around track" (auto-fit window around the crossings / charge with margin).
-   - Hover readout: pixel (ix, iy), its position in µm and, in data mode, its charge.
-   - Save PNG exports the 2D map when it is shown. URL `view=2d` opens it.
-3. Pure layout/marker math lives in a DOM-free module with tests (µm ↔ canvas mapping, fit window, markers,
-   hover pick using geometry.pixelAt; +y up; no transpose).
+1. The app opens on the 2D map. `?view=3d` opens the 3D scene (old `?view=2d` links still work).
+2. The map shows the whole 48 × 192 array by default, filling the viewport: square canvas (the footprint is
+   2.4 × 2.4 mm), axes only over the sensor, every pixel boundary drawn, heavier lines every 16 pixels
+   (the 3 × 12 aligned-ROI tiles). "Zoom to track" stays as an opt-in.
+3. Axis units switch: µm (physical, origin at the centre) or pixel index (0..47, 0..191, ticks at pixel
+   centres, zero-based, no transpose). Default µm. Persisted in the URL (`units=px`).
+4. GUI, by principle:
+   - Hierarchy: view-independent first (Data → Track → Overlays), then the controls of the active view only.
+   - Modularity: controls that only apply to one view live in that view's section and are hidden (not just
+     disabled) in the other view; same for legend entries and readout cells.
+   - Regularity: one name per concept everywhere (Surface z = 0 / Midplane z = −50 µm / Exit z = −100 µm),
+     each crossing toggle carries its legend colour, segmented controls for 2-way choices
+     (view, area, units), view-level actions (Save PNG) in the viewport header.
+   - Abstraction/discipline: shorter header text, no duplicate controls, nothing shown that the view cannot draw.
+5. Tests for the new layout helpers (square fit, pixel-unit ticks, grid majors), `npm test` green,
+   headless browser QA of 2D (demo + data) and 3D.
 
 ## Assumptions (reversible)
-- "Exit" = crossing of the bottom plane z = −100 (same as the 3D view and readout). Side exits keep their
-  existing separate reporting; the 2D map draws the volume's side exit point separately if it differs.
-- Camera controls are disabled while 2D is shown.
-- The legacy `?renderer=2d` projected fallback stays (it is a 3D projection, not this map).
+- "48 × 192, zoomed" = the default "Around the track" framing; the fix is full-sensor default at true aspect
+  (pixels drawn 50 × 12.5 µm, so they look 4:1 wide). An index-space square-cell view was not requested.
+- 3D keeps its features unchanged; only its controls are grouped/hidden when 2D is shown.

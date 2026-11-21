@@ -17,13 +17,16 @@ import { SENSOR, pixelAt, progressAtZ, pointAtProgress } from './geometry.js';
 import { chargeColor, pixelShading } from './chargeColors.js';
 
 export const FULL_WINDOW = Object.freeze({ x0: -SENSOR.halfX, x1: SENSOR.halfX, y0: -SENSOR.halfY, y1: SENSOR.halfY });
-export const MAP_FITS = Object.freeze(['track', 'full']);
+export const MAP_FITS = Object.freeze(['full', 'track']);
+export const AXIS_UNITS = Object.freeze(['um', 'px']);
+/** Heavier grid line every MAJOR pixels: 48 / 16 × 192 / 16 = the 3 × 12 aligned-ROI tiles. */
+export const MAJOR = 16;
 
 /** Crossing markers, in drawing order. `z` is the physical plane in µm. Colours match the 3D markers. */
 export const CROSSINGS = Object.freeze([
-  { key: 'top', z: SENSOR.zTop, title: 'surface', long: 'Top-surface impact (z = 0)', color: '#62f5f3' },
-  { key: 'mid', z: SENSOR.zMid, title: 'midplane', long: 'Midplane crossing (z = −50 µm)', color: '#8fc3ff' },
-  { key: 'exit', z: SENSOR.zBottom, title: 'exit', long: 'Exit plane (z = −100 µm)', color: '#ffa070' },
+  { key: 'top', z: SENSOR.zTop, title: 'surface', long: 'Surface (z = 0)', color: '#62f5f3' },
+  { key: 'mid', z: SENSOR.zMid, title: 'midplane', long: 'Midplane (z = −50 µm)', color: '#8fc3ff' },
+  { key: 'exit', z: SENSOR.zBottom, title: 'exit', long: 'Exit (z = −100 µm)', color: '#ffa070' },
 ]);
 
 const inFootprint = (p) => p.x >= -SENSOR.halfX && p.x < SENSOR.halfX && p.y >= -SENSOR.halfY && p.y < SENSOR.halfY;
@@ -125,15 +128,80 @@ export function tickStep(scale, minPx = 70) {
   return 10 * pow;
 }
 
+/** Smallest power-of-two index step (1, 2, 4, … 64) whose ticks are at least `minPx` apart. */
+export function indexStep(pitch, scale, minPx = 40) {
+  let step = 1;
+  while (step < 64 && step * pitch * scale < minPx) step *= 2;
+  return step;
+}
+
+/**
+ * Axis ticks for the visible window, limited to the sensor footprint.
+ *  units 'um': physical µm (origin at the sensor centre), nice steps.
+ *  units 'px': zero-based pixel index at pixel centres (x 0..47, y 0..191).
+ * Returns { x: [{ at, text }], y: [{ at, text }], title: { x, y } } with `at` in µm.
+ */
+export function axisTicks(visible, scale, units = 'um') {
+  const clip = (lo, hi, half) => [Math.max(lo, -half), Math.min(hi, half)];
+  if (units === 'px') {
+    const axis = (lo, hi, half, pitch, n) => {
+      const step = indexStep(pitch, scale);
+      const out = [];
+      for (let i = 0; i < n; i += step) {
+        const at = -half + (i + 0.5) * pitch;
+        if (at >= lo && at <= hi) out.push({ at, text: String(i) });
+      }
+      return out;
+    };
+    return {
+      x: axis(visible.x0, visible.x1, SENSOR.halfX, SENSOR.pitchX, SENSOR.pixelsX),
+      y: axis(visible.y0, visible.y1, SENSOR.halfY, SENSOR.pitchY, SENSOR.pixelsY),
+      title: { x: 'x pixel index →', y: 'y pixel index →' },
+    };
+  }
+  const step = tickStep(scale);
+  const axis = (lo, hi, half) => {
+    const [a, b] = clip(lo, hi, half);
+    const out = [];
+    for (let v = Math.ceil(a / step - 1e-9) * step; v <= b + 1e-9; v += step) {
+      const at = Math.round(v * 1000) / 1000;
+      out.push({ at, text: String(Math.round(at * 10) / 10) });
+    }
+    return out;
+  };
+  return {
+    x: axis(visible.x0, visible.x1, SENSOR.halfX),
+    y: axis(visible.y0, visible.y1, SENSOR.halfY),
+    title: { x: 'x (µm) →', y: 'y (µm) →' },
+  };
+}
+
+/**
+ * Pixel boundaries to draw along one axis between index lo and hi: every
+ * boundary when they are at least `minPx` apart, otherwise every 2nd, 4th, …; indices
+ * that are multiples of MAJOR are flagged as major.
+ */
+export function gridLines(lo, hi, pitch, scale, minPx = 2.5) {
+  // Powers of two (≤ MAJOR) so thinned lines divide the 16-pixel tiles evenly.
+  let every = 1;
+  while (every < MAJOR && every * pitch * scale < minPx) every *= 2;
+  const out = [];
+  for (let i = lo; i <= hi; i++) {
+    const major = i % MAJOR === 0;
+    if (major || i % every === 0) out.push({ i, major });
+  }
+  return out;
+}
+
 /**
  * Draw the map. `options`:
  *  trace, volume, traversed, roi, charge, mode, progress (0..1),
  *  show: { grid, traversed, roi, top, mid, exit, centroid, labels },
- *  fit ('track' | 'full'), hover ({ pixel, x, y } | null), dpr.
+ *  fit ('full' | 'track'), units ('um' | 'px'), hover ({ pixel, x, y } | null), dpr.
  * Returns the transform used (for hover picking).
  */
 export function drawPixelMap(ctx, width, height, options) {
-  const { trace, volume = null, traversed = [], roi = null, charge = null, frameCharge = null, mode = 'demo', progress = 1, show = {}, fit = 'track', hover = null, dpr = 1 } = options;
+  const { trace, volume = null, traversed = [], roi = null, charge = null, frameCharge = null, mode = 'demo', progress = 1, show = {}, fit = 'full', units = 'um', hover = null, dpr = 1 } = options;
   const shading = pixelShading({ mode, charge });
   // Frame on `frameCharge` (e.g. the event's last slice) so the view stays put while scrubbing slices.
   const win = mapWindow(fit, { trace, volume, charge: shading === 'charge' ? (frameCharge ?? charge) : null });
@@ -183,23 +251,28 @@ export function drawPixelMap(ctx, width, height, options) {
     }
   }
 
-  // Grid: every pixel boundary when it is at least 4 canvas px apart, otherwise every n-th.
+  // Grid: pixel boundaries (thinned when denser than 2.5 canvas px) plus a heavier line every MAJOR pixels.
   if (show.grid) {
-    const every = (pitch) => Math.max(1, Math.ceil(4 / (pitch * scale)));
-    ctx.lineWidth = 1;
-    const ex = every(SENSOR.pitchX);
-    const ey = every(SENSOR.pitchY);
-    ctx.strokeStyle = 'rgba(120,160,200,0.22)';
-    ctx.beginPath();
-    for (let ix = ix0 - (ix0 % ex); ix <= ix1; ix += ex) {
-      const [x] = P(-SENSOR.halfX + ix * SENSOR.pitchX, 0);
-      ctx.moveTo(Math.round(x) + 0.5, Math.max(fy0, 0)); ctx.lineTo(Math.round(x) + 0.5, Math.min(fy1, height));
+    const xs = gridLines(ix0, ix1, SENSOR.pitchX, scale);
+    const ys = gridLines(iy0, iy1, SENSOR.pitchY, scale);
+    const top = Math.max(fy0, 0); const bot = Math.min(fy1, height);
+    const left = Math.max(fx0, 0); const right = Math.min(fx1, width);
+    for (const major of [false, true]) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = major ? 'rgba(150,190,225,0.45)' : 'rgba(120,160,200,0.16)';
+      ctx.beginPath();
+      for (const g of xs) {
+        if (g.major !== major) continue;
+        const [x] = P(-SENSOR.halfX + g.i * SENSOR.pitchX, 0);
+        ctx.moveTo(Math.round(x) + 0.5, top); ctx.lineTo(Math.round(x) + 0.5, bot);
+      }
+      for (const g of ys) {
+        if (g.major !== major) continue;
+        const [, y] = P(0, -SENSOR.halfY + g.i * SENSOR.pitchY);
+        ctx.moveTo(left, Math.round(y) + 0.5); ctx.lineTo(right, Math.round(y) + 0.5);
+      }
+      ctx.stroke();
     }
-    for (let iy = iy0 - (iy0 % ey); iy <= iy1; iy += ey) {
-      const [, y] = P(0, -SENSOR.halfY + iy * SENSOR.pitchY);
-      ctx.moveTo(Math.max(fx0, 0), Math.round(y) + 0.5); ctx.lineTo(Math.min(fx1, width), Math.round(y) + 0.5);
-    }
-    ctx.stroke();
   }
   ctx.strokeStyle = '#5f84a6';
   ctx.lineWidth = 1.5;
@@ -310,7 +383,7 @@ export function drawPixelMap(ctx, width, height, options) {
   }
 
   drawLabels(ctx, labels);
-  drawAxes(ctx, t);
+  drawAxes(ctx, t, units);
   return t;
 }
 
@@ -377,38 +450,46 @@ function label(ctx, text, x, y, color, align = 'left') {
   ctx.textAlign = 'left';
 }
 
-function drawAxes(ctx, t) {
+/** Canvas x of the y axis and canvas y of the x axis: the footprint edges, kept inside the padding. */
+export function axisBaselines(t) {
+  const [fx0] = t.toCanvas(-SENSOR.halfX, 0);
+  const [, fy0] = t.toCanvas(0, -SENSOR.halfY);
+  return { left: Math.max(t.pad.left, fx0), bottom: Math.min(t.height - t.pad.bottom, fy0) };
+}
+
+function drawAxes(ctx, t, units) {
   const { visible, toCanvas, scale, pad, width, height } = t;
-  const step = tickStep(scale);
+  const ticks = axisTicks(visible, scale, units);
+  const { left, bottom } = axisBaselines(t);
+  ctx.fillStyle = '#0a1626';
+  ctx.fillRect(0, height - pad.bottom, width, pad.bottom);
+  ctx.fillRect(0, 0, pad.left, height);
   ctx.font = '600 11px ui-monospace, monospace';
-  ctx.fillStyle = '#9fb7cb';
   ctx.strokeStyle = '#6b8aa6';
   ctx.lineWidth = 1;
-  const bottom = height - pad.bottom;
-  ctx.fillStyle = '#0a1626';
-  ctx.fillRect(0, bottom, width, pad.bottom);
-  ctx.fillRect(0, 0, pad.left, height);
   ctx.fillStyle = '#9fb7cb';
   ctx.textAlign = 'center';
-  for (let x = Math.ceil(visible.x0 / step) * step; x <= visible.x1; x += step) {
-    const [px] = toCanvas(x, 0);
+  for (const { at, text } of ticks.x) {
+    const [px] = toCanvas(at, 0);
     ctx.beginPath(); ctx.moveTo(px, bottom); ctx.lineTo(px, bottom + 5); ctx.stroke();
-    ctx.fillText(String(Math.round(x * 10) / 10), px, bottom + 17);
+    ctx.fillText(text, px, bottom + 17);
   }
   ctx.textAlign = 'right';
-  for (let y = Math.ceil(visible.y0 / step) * step; y <= visible.y1; y += step) {
-    const [, py] = toCanvas(0, y);
+  for (const { at, text } of ticks.y) {
+    const [, py] = toCanvas(0, at);
     if (py < pad.top - 2 || py > bottom) continue;
-    ctx.beginPath(); ctx.moveTo(pad.left - 5, py); ctx.lineTo(pad.left, py); ctx.stroke();
-    ctx.fillText(String(Math.round(y * 10) / 10), pad.left - 8, py + 4);
+    ctx.beginPath(); ctx.moveTo(left - 5, py); ctx.lineTo(left, py); ctx.stroke();
+    ctx.fillText(text, left - 8, py + 4);
   }
   ctx.textAlign = 'center';
   ctx.fillStyle = '#7f98ae';
-  ctx.fillText('x (µm) →', pad.left + (width - pad.left - pad.right) / 2, bottom + 33);
+  const [cx] = toCanvas((visible.x0 + visible.x1) / 2, 0);
+  const [, cy] = toCanvas(0, (visible.y0 + visible.y1) / 2);
+  ctx.fillText(ticks.title.x, cx, bottom + 33);
   ctx.save();
-  ctx.translate(13, pad.top + (bottom - pad.top) / 2);
+  ctx.translate(Math.max(13, left - 43), cy);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText('y (µm) →', 0, 0);
+  ctx.fillText(ticks.title.y, 0, 0);
   ctx.restore();
   ctx.textAlign = 'left';
 }

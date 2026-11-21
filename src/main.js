@@ -4,7 +4,7 @@ import {
 import { PRESETS } from './presets.js';
 import { createRenderer } from './renderer.js';
 import { drawRoiPanel } from './roiPanel.js';
-import { drawPixelMap, pickPixel, MAP_FITS } from './pixelMap2d.js';
+import { drawPixelMap, pickPixel, MAP_FITS, AXIS_UNITS } from './pixelMap2d.js';
 import { createDataPanel, DATA_DEFAULTS } from './dataPanel.js';
 
 const el = (id) => document.getElementById(id);
@@ -21,8 +21,9 @@ const VIEW_DEFAULTS = Object.freeze({
   showLabels: true,
   loop: false,
   // 2D pixel map
-  view: '3d',
-  mapFit: 'track',
+  view: '2d',
+  mapFit: 'full',
+  axisUnits: 'um',
   markTop: true,
   markMid: true,
   markExit: true,
@@ -75,6 +76,8 @@ async function createBestRenderer() {
 
 const um = (value) => (Number.isFinite(value) ? `${value.toFixed(1)} µm` : '—');
 const px = (pixel) => (pixel ? `(${pixel.x}, ${pixel.y})` : 'outside');
+/** Crossing cell: position on one line, pixel on the next. */
+const crossing = (p, pixel) => `${um(p.x)}, ${um(p.y)}\npixel ${px(pixel)}`;
 const FACE = { top: 'top', bottom: 'bottom', 'x-': 'x− side', 'x+': 'x+ side', 'y-': 'y− side', 'y+': 'y+ side' };
 
 function updateReadout() {
@@ -84,15 +87,11 @@ function updateReadout() {
   const roi = roiWindow(ray.topPixel, state.roiMode);
   el('hitStatus').textContent = ray.hit ? 'HIT' : 'MISS';
   el('hitStatus').className = ray.hit ? 'good' : 'warn';
-  el('hitPixel').textContent = ray.topPixel ? `(${ray.topPixel.x}, ${ray.topPixel.y})` : '—';
-  el('hitPosition').textContent = `${um(ray.top.x)}, ${um(ray.top.y)}`;
-  el('midPosition').textContent = `${um(ray.mid.x)}, ${um(ray.mid.y)} · px ${px(ray.midPixel)}`;
-  el('exitPosition').textContent = `${um(ray.bottom.x)}, ${um(ray.bottom.y)} · px ${px(ray.exitPixel)}`;
-  el('volumePath').textContent = volume
-    ? `${FACE[volume.entryFace]} → ${FACE[volume.exitFace]} · ${volume.length.toFixed(1)} µm`
-    : 'does not cross silicon';
-  el('traversedCount').textContent = volume ? `${traversed.length} pixel${traversed.length === 1 ? '' : 's'}` : '—';
-  el('viewDescription').textContent = `Z shown ×${state.zStretch}`;
+  el('hitPosition').textContent = crossing(ray.top, ray.topPixel);
+  el('midPosition').textContent = crossing(ray.mid, ray.midPixel);
+  el('exitPosition').textContent = crossing(ray.bottom, ray.exitPixel);
+  el('volumePath').textContent = volume ? `${FACE[volume.entryFace]} → ${FACE[volume.exitFace]}` : 'does not cross silicon';
+  el('volumeLength').textContent = volume ? `${volume.length.toFixed(1)} µm · ${traversed.length} pixel${traversed.length === 1 ? '' : 's'}` : '—';
   el('stretchBadge').textContent = `Z display ×${state.zStretch}`;
   el('zLabel').textContent = `×${state.zStretch}`;
   el('rendererBadge').textContent = renderer?.kind === 'webgl' ? 'WebGL · Three.js' : '2D canvas fallback';
@@ -105,7 +104,7 @@ function updateReadout() {
       ? 'No pixelAV event loaded yet (no charge shown)'
       : 'Demo mode: no pixel shading (geometry only)';
   el('roiCaption').textContent = roi
-    ? `ROI x ${roi.x0}–${roi.x1 - 1}, y ${roi.y0}–${roi.y1 - 1} (${state.roiMode === 'aligned' ? 'aligned tile' : 'centered on impact'}) = 800 × 200 µm. ${shading}; amber dots: pixels crossed by the track (geometric).`
+    ? `ROI x ${roi.x0}–${roi.x1 - 1}, y ${roi.y0}–${roi.y1 - 1} (${state.roiMode === 'aligned' ? 'aligned tile' : 'centred on surface pixel'}) = 800 × 200 µm. ${shading}; amber dots: pixels crossed by the track (geometric).`
     : 'No top-surface hit, so no ROI is defined.';
   // 'data' only once an event is loaded, so no text claims a truth track before then.
   document.body.dataset.mode = state.mode === 'data' ? (state.event ? 'data' : 'data-pending') : 'demo';
@@ -139,6 +138,7 @@ function drawMap() {
     mode: state.mode,
     progress: state.progress,
     fit: state.mapFit,
+    units: state.axisUnits,
     hover: mapHover,
     dpr,
     show: {
@@ -177,31 +177,51 @@ function renderHover() {
   box.textContent = text;
 }
 
-function setView(view) {
-  state.view = view === '2d' ? '2d' : '3d';
-  frame.dataset.view = state.view;
-  document.body.dataset.view = state.view;
-  el('view3d').setAttribute('aria-pressed', String(state.view === '3d'));
-  el('view2d').setAttribute('aria-pressed', String(state.view === '2d'));
-  el('viewTag').textContent = state.view === '2d' ? '2D pixel map' : '3D scene';
-  el('canvasTip').hidden = state.view === '2d'; // the 2D map has its own axes and hover box
-  el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
-  const cameraIds = ['azimuth', 'elevation', 'zStretch', 'viewTop', 'viewSideX', 'viewSideY', 'viewFocus', 'resetView'];
-  for (const id of cameraIds) {
-    if (id === 'viewFocus' && !renderer.setView) continue;
-    el(id).disabled = state.view === '2d';
-  }
-  // The legacy 2D-canvas renderer cannot draw these in 3D, but the 2D map can.
-  if (renderer.kind !== 'webgl') {
-    for (const id of ['roiToggle', 'roiMode', 'traversedToggle']) {
-      el(id).disabled = state.view !== '2d' || (id === 'roiMode' && !state.showRoi);
-      el(id).title = state.view === '2d' ? '' : 'Available in the WebGL (3D) view and the 2D map';
-    }
-  }
+/** Two-way choices share one control: a .seg group of buttons carrying data-value. */
+function setSegment(id, value) {
+  for (const button of el(id).querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.value === value));
+}
+function bindSegment(id, onPick) {
+  el(id).addEventListener('click', (event) => {
+    const value = event.target.closest('button')?.dataset.value;
+    if (value) onPick(value);
+  });
+}
+
+/** Mirror the display choices into the URL so a link reopens the same view. */
+function syncUrl() {
   const params = new URLSearchParams(location.search);
-  if (state.view === '2d') params.set('view', '2d'); else params.delete('view');
+  if (state.view === '3d') params.set('view', '3d'); else params.delete('view');
+  if (state.axisUnits === 'px') params.set('units', 'px'); else params.delete('units');
+  if (state.mapFit === 'track') params.set('fit', 'track'); else params.delete('fit');
   const query = params.toString();
   history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`);
+}
+
+/**
+ * The legacy 2D-canvas renderer (?renderer=2d) draws only the original 3D
+ * scene: ROI, pixels crossed and labels work in its place only on the 2D map.
+ * One place decides which controls are enabled.
+ */
+function syncLegacyControls() {
+  el('roiMode').disabled = !state.showRoi;
+  if (renderer.kind === 'webgl') return;
+  const in3d = state.view === '3d';
+  for (const id of ['roiToggle', 'roiMode', 'traversedToggle', 'labelsToggle']) {
+    el(id).disabled = in3d || (id === 'roiMode' && !state.showRoi) || id === 'labelsToggle';
+    el(id).title = in3d ? 'Not drawn by the 2D-canvas fallback; use the 2D map' : '';
+  }
+}
+
+function setView(view) {
+  state.view = view === '3d' ? '3d' : '2d';
+  frame.dataset.view = state.view;
+  document.body.dataset.view = state.view;
+  setSegment('viewSwitch', state.view);
+  el('viewTag').textContent = state.view === '2d' ? '2D pixel map' : '3D scene';
+  el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
+  syncLegacyControls();
+  syncUrl();
   mapHover = null;
   if (state.view === '3d') renderer.resize();
   update();
@@ -305,7 +325,7 @@ function bindControls() {
     el(id).checked = !!state[key];
     el(id).addEventListener('change', (event) => {
       state[key] = event.target.checked;
-      el('roiMode').disabled = !state.showRoi || (renderer.kind !== 'webgl' && state.view !== '2d');
+      syncLegacyControls();
       update();
     });
   }
@@ -316,14 +336,20 @@ function bindControls() {
     update();
   });
 
-  el('mapFit').value = state.mapFit;
-  el('mapFit').addEventListener('change', (event) => {
-    state.mapFit = MAP_FITS.includes(event.target.value) ? event.target.value : 'track';
+  bindSegment('viewSwitch', setView);
+  bindSegment('mapFit', (value) => {
+    state.mapFit = MAP_FITS.includes(value) ? value : 'full';
+    setSegment('mapFit', state.mapFit);
+    syncUrl();
     mapHover = null;
     update();
   });
-  el('view3d').addEventListener('click', () => setView('3d'));
-  el('view2d').addEventListener('click', () => setView('2d'));
+  bindSegment('axisUnits', (value) => {
+    state.axisUnits = AXIS_UNITS.includes(value) ? value : 'um';
+    setSegment('axisUnits', state.axisUnits);
+    syncUrl();
+    update();
+  });
   mapCanvas.addEventListener('pointermove', (event) => {
     if (!mapTransformUsed) return;
     const rect = mapCanvas.getBoundingClientRect();
@@ -445,7 +471,6 @@ function bindLegacyPointer() {
 renderer = await createBestRenderer();
 frame.dataset.renderer = renderer.kind;
 if (renderer.kind !== 'webgl') {
-  frame.querySelector('.canvas-tip').textContent = 'Drag to orbit · scroll to zoom';
   for (const id of ['viewTop', 'viewSideX', 'viewSideY']) el(id).title = 'Orbit presets (2D fallback: approximate)';
   ELEVATION_MIN = 5;
   ELEVATION_MAX = 85;
@@ -458,15 +483,13 @@ el('viewFocus').disabled = !renderer.setView;
 bindControls();
 const dataPanel = createDataPanel({ state, el, update, stopParticle: stop });
 dataPanel.bind();
-if (renderer.kind !== 'webgl') {
-  // The 2D fallback draws only the original scene; disable toggles it cannot show.
-  for (const id of ['roiToggle', 'roiMode', 'traversedToggle', 'labelsToggle', 'viewFocus']) {
-    el(id).disabled = true;
-    el(id).title = 'Available in the WebGL (3D) view only';
-  }
-}
 renderer.resize();
-setView(new URLSearchParams(location.search).get('view') === '2d' ? '2d' : '3d');
+const params = new URLSearchParams(location.search);
+state.axisUnits = params.get('units') === 'px' ? 'px' : 'um';
+state.mapFit = params.get('fit') === 'track' ? 'track' : 'full';
+setSegment('axisUnits', state.axisUnits);
+setSegment('mapFit', state.mapFit);
+setView(params.get('view') === '3d' ? '3d' : '2d'); // old ?view=2d links land here too
 
 // Read-only diagnostics for the browser console / integration checks.
 // Not a stable API; import geometry.js directly in code.

@@ -434,9 +434,9 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
 
     // Plane crossings: top (z=0), midplane (z=−50), exit/bottom (z=−100).
     const crossings = [
-      { key: 'top', p: trace.top, pixel: trace.topPixel, color: COLORS.top, z: SENSOR.zTop, title: 'top impact' },
-      { key: 'mid', p: trace.mid, pixel: trace.midPixel, color: COLORS.midMarker, z: SENSOR.zMid, title: 'midplane z=−50' },
-      { key: 'exit', p: trace.bottom, pixel: trace.exitPixel, color: COLORS.exit, z: SENSOR.zBottom, title: 'exit z=−100' },
+      { key: 'top', p: trace.top, pixel: trace.topPixel, color: COLORS.top, z: SENSOR.zTop, title: 'surface' },
+      { key: 'mid', p: trace.mid, pixel: trace.midPixel, color: COLORS.midMarker, z: SENSOR.zMid, title: 'midplane' },
+      { key: 'exit', p: trace.bottom, pixel: trace.exitPixel, color: COLORS.exit, z: SENSOR.zBottom, title: 'exit' },
     ].filter((c) => c.key !== 'mid' || s.showMid);
 
     const reveal = [];

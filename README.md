@@ -2,11 +2,11 @@
 
 An interactive browser application for visualizing a charged particle traveling toward and through a **48 × 192 silicon pixel sensor**. The project is based on the earlier custom single-file prototype and the reference sensor-geometry sketch included under `assets/`.
 
+![2D pixel map (default view): the whole 48 × 192 array with surface, midplane and exit markers](assets/preview-2d.png)
+
 ![3D WebGL view with 16 × 16 ROI](assets/preview-3d.png)
 
 ![Focus on the impact pixel](assets/preview-3d-focus.png)
-
-![2D pixel map: pixelAV event with surface, midplane and exit markers](assets/preview-2d.png)
 
 > **Important:** The ray trajectory, plane crossings, volume entry/exit and per-pixel path lengths are **geometric** calculations of a straight line. In demo mode the pixels are **not shaded** by any charge model (the earlier illustrative Gaussian was removed in v0.4.0). Pixel charge appears only in data mode, and it is **pixelAV simulated** output, loaded from converted events.
 >
@@ -46,34 +46,36 @@ The browser then fetches **one event per HTTP Range request** (about 4 KB) and n
 
 ## What works today
 
-**3D view (Three.js / WebGL)**
+**Layout.** The viewport header holds the view switch (**2D map** | **3D**), the options of the view shown and **Save PNG**. The side panel goes from the model to the display: **Data** (demo or pixelAV), **Track** (preset, start point, angles), **Overlays** (grid, pixels crossed, ROI; both views), then the controls of the active view only (**Crossings** for the 2D map, **Scene** for 3D). The surface, midplane and exit use the same names and colours in the toggles, legend, labels and readout.
+
+**3D view (Three.js / WebGL; `?view=3d`)**
 
 - Volumetric, translucent 2400 × 2400 × 100 µm silicon slab; top surface carries the 48 × 192 pixel pads (one texel per pixel) and grid lines, with major lines every 16 pixels (the ROI tiling). Backside plane at z = −100 µm and an optional dashed midplane at z = −50 µm.
 - Orientation aids: a physical **+X / +Y / +Z** axis triad, `col 0 / col 47` and `row 0 / row 191` labels at the array edges, and dimension labels. These make an accidental X/Y transpose easy to spot.
 - **Orbit** (drag), **pan** (right-drag or shift-drag), and **zoom** (wheel or pinch), with damping. Zoom goes down to single 50 × 12.5 µm pixels. The orbit and elevation sliders and the keyboard (arrow keys, `+`/`−`, space to play) stay in sync with the mouse. Elevation goes to −89°, so you can look at the exit from below.
 - View presets: **Top**, **Side X–Z**, **Side Y–Z**, **Focus impact**, and **Reset camera**. The camera refits automatically when the trajectory changes, unless you have panned.
 - Animated particle with glow and a trail. The part of the path inside silicon is drawn brighter. As the particle passes each plane, its marker and the pixel at that crossing appear:
-  - **top impact** (cyan ring, cell outline, and a translucent 50 × 12.5 × 100 µm pixel column),
-  - **midplane crossing** (blue),
-  - **exit** at z = −100 µm (orange).
+  - **surface** (z = 0; cyan ring, cell outline, and a translucent 50 × 12.5 × 100 µm pixel column),
+  - **midplane** (z = −50 µm; blue),
+  - **exit** (z = −100 µm; orange).
   Crossings outside the sensor footprint are drawn grey and labelled “outside sensor”.
 - **16 × 16 ROI toggle** (800 × 200 µm, drawn as a volume outline). You choose the placement: *centered on the impact pixel* (shifted inward at the array edge) or *aligned tile* of the fixed 3 × 12 tiling.
 - **Pixels crossed by the track (geometric)**: the pixel columns that the in-silicon segment passes through, shown on the pads and as faint columns.
 - Side entry/exit through the slab's side faces is marked and labelled separately. It is **never** counted as a top-surface HIT.
 - Loop playback, timeline scrubbing, and **Save PNG** of the 3D scene (the HTML labels are not included in the PNG).
 
-**2D pixel map** (the **3D / 2D map** switch in the viewport header, or `?view=2d`)
+**2D pixel map** (the default view)
 
-- A top view of all 48 × 192 pixels at true aspect, so each pixel appears 50 × 12.5 µm, with µm axes, +x right, +y up and zero-based indices.
+- A top view of all 48 × 192 pixels at true aspect: the 2.4 × 2.4 mm footprint fills a square plot, so each pixel appears 50 × 12.5 µm. Every pixel boundary is drawn, with heavier lines every 16 pixels (the 3 × 12 aligned-ROI tiles). +x right, +y up, zero-based indices.
+- **Axis units**: **µm** (origin at the sensor centre) or **pixels** (index 0–47 and 0–191, ticks at pixel centres). `?units=px` opens the map in pixel units.
 - Optional markers, each toggled on its own, for the **top-surface impact (z = 0)**, the **midplane crossing (z = −50 µm)** and the **exit (z = −100 µm)**. Each marker is a crosshair at the crossing point plus an outline of its pixel and a label such as `surface · px (17, 99)`. Crossings outside the footprint are drawn hollow and labelled "outside sensor". During the animation each marker appears when the particle reaches its plane.
 - The projected track (dashed above the surface, bright inside the silicon), the pixels it crosses, the 16 × 16 ROI and the pixel grid follow the same overlay toggles as the 3D view. Side entry and side exit points are marked separately.
 - In data mode the pixels are coloured by the pixelAV simulated charge of the selected time slice. An optional diamond marks the charge-weighted centroid.
-- The area shown is either **Around the track** (framing the crossings and the charged pixels) or the **Full sensor**. Hover over a pixel to see its index, its position and, in data mode, its charge. **Save PNG** exports the map.
+- The area shown is the **Full sensor** (default) or **Zoom to track** (framing the crossings and the charged pixels). Hover over a pixel to see its index, its position and, in data mode, its charge. **Save PNG** exports the map.
 
 **Readouts and panels**
 
-- Top-surface **HIT/MISS**, impact position, and zero-based `(x, y)` pixel; midplane and exit positions with their pixels.
-- Silicon volume: entry face → exit face, and the 3D chord length in µm. Count of pixel columns crossed.
+- **Track crossings**: surface, midplane and exit, each with its position and zero-based `(x, y)` pixel; top-surface **HIT/MISS**; silicon volume entry face → exit face; the 3D chord length in µm and the count of pixel columns crossed.
 - 16 × 16 ROI panel in index space (cells drawn square, +y up, labelled index ranges). It marks the crossed pixels, and in data mode it shows the simulated charge.
 - Presets: normal incidence, angled, oblique, and miss (unchanged).
 

@@ -6,13 +6,14 @@ This page is for whoever continues this project with an AI coding agent. It cove
 - how the first two milestones were run with oh-my-claudecode (OMC),
 - how to check the agent's work before trusting it.
 
-## 1. Where the project stands (v0.3.0)
+## 1. Where the project stands (v0.5.0)
 
 | Milestone | Status | Where to read about it |
 |---|---|---|
 | 1. Three.js volumetric viewer (rotate/zoom, editable track, top/mid/exit animation, 16×16 ROI) | Done, reviewed | `README.md`, `docs/PROJECT_SPEC.md` |
 | 2. pixelAV simulated events (Parquet → sparse files, one event per HTTP Range request) | Done, reviewed | `docs/PIXELAV_DATA.md` |
 | 3. Illustrative Gaussian removed; 2D pixel map with surface/midplane/exit markers (v0.4.0) | Done | `README.md` ("2D pixel map") |
+| 4. 2D map is the default view (full 48 × 192 array, µm / pixel axes); controls regrouped by view (v0.5.0) | Done | `README.md` ("Layout") |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
 1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
@@ -110,7 +111,7 @@ When autopilot cannot get a human answer, it records each guess as an assumption
 Run all of these before accepting a change:
 
 ```bash
-npm test                         # 45 JS tests: geometry, ROI, decoder, loader, dev server, colours
+npm test                         # JS tests: geometry, ROI, 2D map, decoder, loader, dev server, colours
 conda activate <env-with-pyarrow>
 npm run test:converter           # synthetic converter round trip
 PIXELAV_SOURCE=/path/to/dataset_2su_-9_9_48x192_50x12P5_parquets npm run test:converter
@@ -119,7 +120,7 @@ npm run dev                      # then, in another shell:
 npm run qa:browser -- http://127.0.0.1:5173/ /tmp/qa-out    # screenshots + console errors
 ```
 
-`scripts/qa-browser.mjs` drives headless Chrome with software WebGL, so no GPU is needed. Steps come from the `STEPS` env var (the format is at the top of the script). `window.pixelSensorDebug` exposes the state to inspect, for example `pixelSensorDebug.event`, `.charge` and `.dataStats`. The script exits with code 1 if the page throws an exception.
+`scripts/qa-browser.mjs` drives headless Chrome with software WebGL, so no GPU is needed. Steps come from the `STEPS` env var (the format is at the top of the script); `click` takes an id or a CSS selector such as `#axisUnits [data-value=px]`. Screenshots cover the viewport panel (`SHOT_SELECTOR=body` for the whole page). The page opens on the 2D map; add `?view=3d` to check the 3D scene. `window.pixelSensorDebug` exposes the state to inspect, for example `pixelSensorDebug.event`, `.charge` and `.dataStats`. The script exits with code 1 if the page throws an exception.
 
 Then compare against the guardrails in `CLAUDE.md`:
 - 48 × 192 pixels at 50 × 12.5 µm;

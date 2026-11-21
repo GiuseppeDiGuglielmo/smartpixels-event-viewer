@@ -45,7 +45,7 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 - Orbit, pan and zoom camera (OrbitControls), synced with the sliders and keyboard. View presets: top, side X–Z, side Y–Z, focus impact, reset.
 - Play, pause, loop and seek the particle path. Top impact, midplane crossing and exit markers, with their pixels, appear as the particle reaches each plane.
 - 16 × 16 ROI toggle (centered or aligned tile); pixels crossed by the track; label toggle.
-- 2D pixel map (true-aspect top view of the whole array) with toggleable markers for the top-surface impact, midplane crossing and exit, a hover readout, and a choice between "around the track" and full-sensor framing (v0.4.0).
+- 2D pixel map (true-aspect top view of the whole array, the default view) with toggleable markers for the surface, midplane and exit crossings, a hover readout, full-sensor (default) or zoom-to-track framing, and axis labels in µm or pixel index (v0.5.0).
 - Readouts: top/mid/bottom positions and pixel addresses, volume entry→exit faces and chord, number of pixels crossed.
 - PNG export of the current view (3D scene or 2D map).
 

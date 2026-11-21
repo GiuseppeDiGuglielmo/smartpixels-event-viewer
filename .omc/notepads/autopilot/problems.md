@@ -5,3 +5,5 @@
 - `pkill -f` / `pgrep -f` in the same shell command as the matched string kills the shell itself (exit 144) — run kills as a separate command with a bracketed pattern.
 - 2026-11-21 milestone 3 (Gaussian removed, 2D pixel map): three.js sets an inline `display:block` on its canvas, so a CSS rule hiding it for the 2D view silently lost — needed `!important`; caught only by a browser screenshot.
 - Reviewers' main gaps were feature interactions (legacy ?renderer=2d disabling toggles the new view can use, side-entry framing, stale hover after redraw), not core math — browse each mode × view × renderer combination before review.
+- 2026-11-21 m4: architect REQUEST CHANGES once: map axes were anchored to canvas padding, not the footprint (tests only built a square canvas); fixed with axisBaselines + test.
+- 2026-11-21 m4: qa-browser fixed screenshot clip cut off the taller map; clip now follows .viewport-panel (SHOT_SELECTOR).

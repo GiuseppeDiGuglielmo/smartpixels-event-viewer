@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SENSOR, DEFAULT_STATE, traceParticle, pixelCenter, intersectVolume, traversedPixels } from '../src/geometry.js';
 import {
-  FULL_WINDOW, crossingMarkers, mapWindow, mapTransform, pickPixel, tickStep, drawPixelMap,
+  FULL_WINDOW, MAP_FITS, MAJOR, crossingMarkers, mapWindow, mapTransform, pickPixel, tickStep, drawPixelMap,
+  axisTicks, indexStep, gridLines, axisBaselines,
 } from '../src/pixelMap2d.js';
 
 const close = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `expected ${a} ≈ ${b}`);
@@ -204,4 +205,70 @@ test('picking on a pixel boundary follows the half-open rule', () => {
   const t = mapTransform(FULL_WINDOW, 900, 600);
   // x = −1000 is the left edge of column 4; y = −1175 the lower edge of row 2.
   assert.deepEqual(pickPixel(t, ...t.toCanvas(-1000, -1175)).pixel, { x: 4, y: 2 });
+});
+
+test('the default framing is the whole 48 × 192 array, and a square canvas shows exactly the footprint', () => {
+  assert.equal(MAP_FITS[0], 'full');
+  assert.deepEqual(mapWindow(undefined, { trace: traceParticle(DEFAULT_STATE) }), FULL_WINDOW);
+  const pad = { left: 56, right: 16, top: 16, bottom: 40 };
+  const t = mapTransform(FULL_WINDOW, 800 + 72, 800 + 56, pad);
+  close(t.scale, 800 / 2400);
+  close(t.visible.x0, -1200); close(t.visible.x1, 1200);
+  close(t.visible.y0, -1200); close(t.visible.y1, 1200);
+});
+
+test('pixel-unit ticks sit at pixel centres, zero-based, never beyond 47 / 191', () => {
+  const t = mapTransform(FULL_WINDOW, 872, 856);
+  const ticks = axisTicks(t.visible, t.scale, 'px');
+  assert.equal(ticks.x[0].text, '0');
+  close(ticks.x[0].at, -1200 + 25);
+  close(ticks.y[0].at, -1200 + 6.25);
+  for (const { at, text } of ticks.x) {
+    const i = Number(text);
+    assert.ok(i >= 0 && i <= 47);
+    close(at, pixelCenter(i, 0).x);
+  }
+  for (const { at, text } of ticks.y) {
+    const i = Number(text);
+    assert.ok(i >= 0 && i <= 191);
+    close(at, pixelCenter(0, i).y);
+  }
+  assert.match(ticks.title.x, /pixel index/);
+  // Steps are powers of two and leave at least 40 canvas px between labels.
+  const sx = Number(ticks.x[1].text) - Number(ticks.x[0].text);
+  const sy = Number(ticks.y[1].text) - Number(ticks.y[0].text);
+  assert.ok([1, 2, 4, 8, 16, 32, 64].includes(sx) && [1, 2, 4, 8, 16, 32, 64].includes(sy));
+  assert.ok(sx * SENSOR.pitchX * t.scale >= 40 && sy * SENSOR.pitchY * t.scale >= 40);
+  assert.equal(indexStep(SENSOR.pitchY, 1000), 1);
+});
+
+test('µm ticks stay on the sensor footprint even when the canvas is wider', () => {
+  const t = mapTransform(FULL_WINDOW, 1000, 525); // wide canvas: visible x spans beyond ±1200
+  assert.ok(t.visible.x0 < -1200);
+  const ticks = axisTicks(t.visible, t.scale, 'um');
+  assert.ok(ticks.x.every(({ at }) => at >= -1200 && at <= 1200));
+  assert.ok(ticks.x.some(({ at }) => at === 0));
+  assert.match(ticks.title.y, /µm/);
+});
+
+test('grid lines: every boundary when dense enough, majors every 16 pixels always kept', () => {
+  const all = gridLines(0, 48, SENSOR.pitchX, 1);
+  assert.equal(all.length, 49);
+  assert.deepEqual(all.filter((g) => g.major).map((g) => g.i), [0, 16, 32, 48]);
+  const thin = gridLines(0, 192, SENSOR.pitchY, 0.05); // 0.6 px apart: thinned
+  assert.ok(thin.length < 193);
+  assert.deepEqual(thin.filter((g) => g.major).map((g) => g.i), Array.from({ length: 13 }, (_, k) => k * MAJOR));
+  // Thinned lines are evenly spaced, also across the major lines.
+  const gaps = new Set(gridLines(0, 40, SENSOR.pitchY, 0.07).slice(1).map((g, k, a) => g.i - (k ? a[k - 1].i : 0)));
+  assert.equal(gaps.size, 1);
+});
+
+test('axes sit on the footprint edges on a non-square canvas, and on the padding when zoomed in', () => {
+  const t = mapTransform(FULL_WINDOW, 1000, 600); // wide: the sensor is centred horizontally
+  const { left, bottom } = axisBaselines(t);
+  close(left, t.toCanvas(-1200, 0)[0]);
+  close(bottom, t.toCanvas(0, -1200)[1]);
+  assert.ok(left > t.pad.left);
+  const zoom = mapTransform({ x0: -100, x1: 100, y0: -100, y1: 100 }, 1000, 600);
+  assert.deepEqual(axisBaselines(zoom), { left: zoom.pad.left, bottom: 600 - zoom.pad.bottom });
 });
