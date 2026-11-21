@@ -1,0 +1,5 @@
+- 2026-11-21 milestone 1 (Three.js viewer): architect rejected once — closed-box intersectVolume vs half-open pixelAt plus tan(45°) float tie made a top HIT show as "side entry"; fixed with half-open volume + 1e-9 tie rule + boundary tests.
+- No browser test harness in repo; UI QA needed an ad-hoc headless-Chrome CDP script (scratchpad/qa/cdp.mjs) with SwiftShader for WebGL.
+- 2026-11-21 milestone 2 (pixelAV data): source parquet has ~184k columns/1 row group (~100 MB footer, ~0.7 GB RAM just to open) — browser-side reading infeasible; needed a Python (pixelav-env pyarrow) pre-conversion step.
+- Browser QA caught a rapid-click race (requested index set after an await) that unit tests missed; dev-server stream.pipe leaked fds on aborted transfers (fixed with pipeline).
+- `pkill -f` / `pgrep -f` in the same shell command as the matched string kills the shell itself (exit 144) — run kills as a separate command with a bracketed pattern.

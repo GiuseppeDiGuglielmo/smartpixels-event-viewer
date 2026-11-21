@@ -1,0 +1,19 @@
+{
+  "name": "pixel-sensor-simulator",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Interactive 48 × 192 silicon pixel sensor viewer: straight-line track geometry plus pixelAV simulated events (Three.js r187 vendored, no npm install)",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "start": "node scripts/dev-server.mjs",
+    "test": "node --test tests/*.test.js",
+    "check": "npm test",
+    "convert:pixelav": "python scripts/pixelav_convert.py",
+    "test:converter": "python scripts/test_pixelav_convert.py",
+    "qa:browser": "node scripts/qa-browser.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

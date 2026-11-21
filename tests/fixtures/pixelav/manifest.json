@@ -1,0 +1,52 @@
+{
+ "format": "pixelav-sparse-v1",
+ "dataset": "dataset_2su_-9_9_48x192_50x12P5_parquets",
+ "source": "(fixture: first events of test/part.0)",
+ "pixelsX": 48,
+ "pixelsY": 192,
+ "pitchX": 50,
+ "pitchY": 12.5,
+ "slices": 20,
+ "pixelIndex": "p = iy*48 + ix  (source column = t*9216 + p)",
+ "chargeUnits": "electrons, cumulative over time slices (pixelAV simulation)",
+ "truthColumns": [
+  "x-entry",
+  "y-entry",
+  "z-entry",
+  "n_x",
+  "n_y",
+  "n_z",
+  "number_eh_pairs",
+  "y-local",
+  "pt",
+  "original_atEdge",
+  "uncentered_atEdge",
+  "chargeOriginal_atEdge",
+  "chargeUncentered_atEdge",
+  "nPixOriginalAbove1e_atEdge",
+  "nPixUncenteredAbove1e_atEdge",
+  "offset1",
+  "offset2",
+  "cotAlpha",
+  "cotBeta",
+  "y-midplane",
+  "x-midplane"
+ ],
+ "files": [
+  {
+   "split": "test",
+   "name": "part.0",
+   "events": 6,
+   "index": "test/part.0.index.bin",
+   "data": "test/part.0.events.bin",
+   "eventsBytes": 24684,
+   "qaCentroidMinusTruthMidplaneUm": {
+    "x": -24.723787732956122,
+    "y": -22.233291402889755,
+    "events": 5000,
+    "origin": "array centre (raw pixelAV x, y); viewer uses PIXELAV_ORIGIN, see docs"
+   }
+  }
+ ],
+ "createdBy": "scripts/pixelav_convert.py"
+}

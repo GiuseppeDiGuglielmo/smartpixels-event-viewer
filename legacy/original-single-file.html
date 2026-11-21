@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pixel Sensor · 3D Particle Viewer</title>
+<style>
+:root{color-scheme:dark;--bg:#080f1c;--panel:#101c2d;--panel2:#0d192a;--line:#2b4158;--text:#e9f4ff;--muted:#97acc4;--cyan:#5bdcf0;--amber:#ffa75d;--good:#7cf1b2}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 10% -20%,#172a43 0%,transparent 44%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{max-width:1400px;margin:auto;padding:27px 26px 15px}header .eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:11px;font-weight:750;color:var(--cyan)}h1{margin:3px 0 4px;font-weight:650;letter-spacing:-.03em;font-size:clamp(23px,3vw,34px)}.subtitle{color:var(--muted);margin:0;max-width:980px;font-size:14px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:16px;max-width:1400px;padding:0 26px 25px;margin:auto;align-items:start}.viewport-panel,.control-panel,.detail-panel{background:linear-gradient(145deg,#111f33,#0c1829);border:1px solid var(--line);border-radius:14px;overflow:hidden}.viewport-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}.live-tag{font-size:11px;letter-spacing:.12em;font-weight:800;text-transform:uppercase;color:#79ecc0}.head-note{font-size:12px;color:var(--muted)}.canvas-frame{position:relative;background:radial-gradient(ellipse at 55% 38%,#1a304b 0%,#0c1729 62%,#091322 100%)}#scene{width:100%;height:525px;display:block;touch-action:none;cursor:grab}#scene:active{cursor:grabbing}#scene:focus-visible{outline:2px solid var(--cyan);outline-offset:-5px}.overlay{pointer-events:none;position:absolute;left:14px;top:15px;display:flex;gap:7px;flex-wrap:wrap}.pill{background:#081625d9;border:1px solid #2e4b62;padding:5px 9px;border-radius:6px;font:600 11px/1.2 ui-monospace,Consolas,monospace;color:#d5e9fb}.canvas-tip{position:absolute;right:15px;bottom:12px;color:#8eacc1;font-size:11px;pointer-events:none;background:#081625bc;padding:5px 8px;border-radius:5px}.legend{display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding:11px 16px;color:#c6d8e7;font-size:12px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--amber)}.dot.cyan{background:var(--cyan)}.dot.mid{background:#4b91f9}
+.transport{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 15px;border-top:1px solid var(--line)}button,select,input{font:inherit}button{cursor:pointer;background:#1c3148;border:1px solid #426079;color:#e7f5ff;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:650;min-height:39px}button:hover{background:#28455d}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}.primary{background:#155e72;border-color:#32b3cb}.primary:hover{background:#187889}.transport input[type=range]{flex:1;min-width:110px}.progress{min-width:36px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.control-panel{padding:15px 16px}.control-panel h2{font-size:14px;letter-spacing:.02em;margin:0 0 7px;font-weight:700}.control-panel .section{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid var(--line)}.control-panel .section:last-of-type{margin-bottom:0;padding-bottom:3px;border:0}.help{color:var(--muted);font-size:11px;margin:1px 0 9px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field.wide{grid-column:span 2}.field label{font-size:11px;color:#b9cde0;display:block;margin-bottom:4px;font-weight:600}.field input[type=number],select{width:100%;padding:8px 10px;min-height:38px;border:1px solid #395069;background:#0b1727;color:#f4f9ff;border-radius:7px}.field input[type=range]{width:100%;accent-color:#50c9df;margin:10px 0 3px}.field b{float:right;color:#e5f5ff;font-size:11px;font-family:ui-monospace,monospace}.check{display:flex;gap:9px;align-items:center;color:#c8d9e8;font-size:12px;margin-top:10px}.check input{accent-color:#56d6e9;width:17px;height:17px}.section button{width:100%;margin-top:9px}
+.bottom-grid{display:grid;grid-template-columns:1fr 260px;gap:16px;margin-top:16px}.detail-panel{padding:15px 17px}.detail-title{font-size:12px;color:#8eadc3;font-weight:750;text-transform:uppercase;letter-spacing:.12em;margin:0 0 9px}.results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.metric{background:#0b1828;border-radius:9px;padding:9px 10px;min-width:0}.metric label{display:block;font-size:10px;color:#9fb7cb}.metric strong{font:700 14px ui-monospace,"SFMono-Regular",monospace;color:#e4f6ff;word-break:break-word}.metric strong.good{color:var(--good)}.detail-note{color:var(--muted);font-size:11px;margin:11px 0 0} .roi-wrap{display:flex;gap:11px;align-items:center}.roi-wrap canvas{width:140px;height:140px;max-width:48%;border:1px solid #375570;border-radius:8px;background:#091526}.roi-wrap p{color:var(--muted);font-size:11px;margin:0;max-width:125px}.footer{max-width:1400px;margin:auto;padding:0 26px 22px;color:#87a2b9;font-size:11px}
+@media(max-width:990px){main{grid-template-columns:1fr}.control-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.control-panel h2,.control-panel>.help{grid-column:1/-1}.control-panel .section{padding-right:0}.bottom-grid{grid-template-columns:minmax(0,1fr) 255px}}
+@media(max-width:640px){header{padding:18px 13px 13px}main{padding:0 11px 16px}.control-panel{display:block}.bottom-grid{grid-template-columns:1fr}#scene{height:380px}.results{grid-template-columns:1fr 1fr}.overlay{top:10px;left:8px}.canvas-tip{font-size:10px;right:7px;bottom:7px}.footer{padding:0 14px 20px}}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">Interactive detector geometry</div>
+<h1>Particle → Pixel Sensor</h1>
+<p class="subtitle">Orbit a 3D 48 × 192 silicon pixel array, position a particle in (x, y, z), change its direction, and follow the trajectory through the 100 µm sensor. Coordinates use the physical dimensions from your diagram.</p>
+</header>
+<main>
+<div class="left">
+<section class="viewport-panel" aria-label="3D pixel sensor visualization">
+<div class="viewport-head"><span class="live-tag">● 3D scene</span><span class="head-note">X: 48 × 50 µm &nbsp;·&nbsp; Y: 192 × 12.5 µm &nbsp;·&nbsp; Z: 100 µm</span></div>
+<div class="canvas-frame"><canvas id="scene" tabindex="0" aria-label="Rotatable 3D simulation of a pixel sensor and a particle trajectory. Drag to orbit, wheel to zoom. Use the camera controls for accessible orbiting."></canvas><div class="overlay"><span class="pill">2.4 × 2.4 mm</span><span class="pill">9,216 pixels</span><span class="pill" id="stretchBadge">Z display ×5</span></div><div class="canvas-tip">Drag to orbit · scroll to zoom</div></div>
+<div class="legend"><span><i class="dot"></i>Particle &amp; trajectory</span><span><i class="dot cyan"></i>Pixel hit</span><span><i class="dot mid"></i>Midplane (z = −50 µm)</span></div>
+<div class="transport"><button class="primary" type="button" id="play">▶ Play</button><button type="button" id="restart">↺ Restart</button><label for="timeline" style="font-size:12px;color:var(--muted)">Time</label><input id="timeline" type="range" min="0" max="100" value="100" step="1" aria-label="Particle animation progress"><span class="progress" id="progressLabel">100%</span></div>
+</section>
+<div class="bottom-grid">
+<section class="detail-panel"><p class="detail-title">Impact readout</p><div class="results"><div class="metric"><label>Top-surface intersection</label><strong id="hitStatus" class="good">HIT</strong></div><div class="metric"><label>Pixel (X, Y) · zero-based</label><strong id="hitPixel">(17, 99)</strong></div><div class="metric"><label>Position (X, Y)</label><strong id="hitPosition">—</strong></div><div class="metric"><label>Midplane position</label><strong id="midPosition">—</strong></div><div class="metric"><label>Exit position</label><strong id="exitPosition">—</strong></div><div class="metric"><label>Display</label><strong id="viewDescription">not to scale in Z</strong></div></div><p class="detail-note">The trajectory is straight and deterministic. Deposited charge and pixel brightness are illustrative, not a Geant4 or Allpix² simulation.</p></section>
+<section class="detail-panel"><p class="detail-title">16 × 16 pixel neighborhood</p><div class="roi-wrap"><canvas id="roi" width="320" height="320" role="img" aria-label="Illustrative zoom of sixteen by sixteen pixel cells around the simulated impact"></canvas><p>Illustrative cluster near the top-surface hit. The selected 48 × 192 sensor pixel is shown in the readout.</p></div></section>
+</div>
+</div>
+<aside class="control-panel">
+<h2>Scene controls</h2><p class="help">Physical units: micrometers (µm). Sensor top surface is z = 0; silicon extends to z = −100.</p>
+<div class="section"><h2>Particle start</h2><div class="fields"><div class="field"><label for="x0">X₀ (µm)</label><input type="number" id="x0" value="-620" min="-5000" max="5000" step="50"></div><div class="field"><label for="y0">Y₀ (µm)</label><input type="number" id="y0" value="125" min="-5000" max="5000" step="25"></div><div class="field wide"><label for="z0">Z₀ above top (µm)</label><input type="number" id="z0" value="600" min="10" max="5000" step="50"></div></div></div>
+<div class="section"><h2>Particle direction</h2><p class="help">Angles define the X and Y slopes as the particle travels downward (−Z).</p><div class="fields"><div class="field"><label for="thetaX">X tilt (°)</label><input type="number" id="thetaX" value="28" min="-75" max="75" step="1"></div><div class="field"><label for="thetaY">Y tilt (°)</label><input type="number" id="thetaY" value="-8" min="-75" max="75" step="1"></div><div class="field wide"><label for="preset">Trajectory preset</label><select id="preset"><option value="manual">Custom</option><option value="straight">Normal incidence</option><option value="angled" selected>Angled incidence</option><option value="grazing">Oblique incidence</option><option value="miss">Miss the sensor</option></select></div></div></div>
+<div class="section"><h2>Camera &amp; rendering</h2><div class="fields"><div class="field wide"><label for="azimuth">Orbit angle <b id="azLabel">35°</b></label><input type="range" id="azimuth" min="-180" max="180" value="35" step="1"></div><div class="field wide"><label for="elevation">Elevation <b id="elLabel">30°</b></label><input type="range" id="elevation" min="5" max="85" value="30" step="1"></div><div class="field wide"><label for="zStretch">Z exaggeration <b id="zLabel">×5</b></label><input type="range" id="zStretch" min="1" max="12" value="5" step="1"></div></div><label class="check"><input id="gridToggle" type="checkbox" checked>Show pixel grid</label><label class="check"><input id="midToggle" type="checkbox" checked>Show midplane</label><button type="button" id="resetView">Reset camera</button></div>
+</aside>
+</main>
+<p class="footer">Schematic 3D geometry for demonstrations. X pixel index 0–47, Y index 0–191. The z-axis is stretched for visibility by the adjustable factor shown above; all numerical readouts use real µm dimensions. Open this HTML file directly in a browser—no internet, account, or dependencies required.</p>
+<script>
+(()=>{
+'use strict';
+const el=id=>document.getElementById(id);
+const canvas=el('scene'),ctx=canvas.getContext('2d'),roi=el('roi'),rctx=roi.getContext('2d');
+const bounds={x:1200,y:1200,z:100};
+const def={x0:-620,y0:125,z0:600,thetaX:28,thetaY:-8,azimuth:35,elevation:30,zStretch:5,zoom:1,progress:1,showGrid:true,showMid:true};
+const s={...def,animating:false};
+let W=700,H=525,dpr=1,frame=null,startedAt=0,startProgress=0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const deg=x=>x*Math.PI/180;
+const xyz=(x,y,z)=>({x,y,z});
+const lerp=(a,b,t)=>a+(b-a)*t;
+const line=(a,b,color,width=1,dash=[])=>{ctx.beginPath();ctx.setLineDash(dash);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=width;ctx.strokeStyle=color;ctx.stroke();ctx.setLineDash([])};
+const polygon=(ps,fill,stroke,width=1)=>{ctx.beginPath();ps.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.lineWidth=width;ctx.strokeStyle=stroke;ctx.stroke()}};
+const circle=(p,r,fill,outline)=>{ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(outline){ctx.lineWidth=1.6;ctx.strokeStyle=outline;ctx.stroke()}};
+function trace(){const dx=Math.tan(deg(s.thetaX)),dy=Math.tan(deg(s.thetaY));const atZ=z=>xyz(s.x0+(s.z0-z)*dx,s.y0+(s.z0-z)*dy,z);const top=atZ(0),mid=atZ(-50),bottom=atZ(-100);return {start:xyz(s.x0,s.y0,s.z0),top,mid,bottom,hit:Math.abs(top.x)<1200&&Math.abs(top.y)<1200,midHit:Math.abs(mid.x)<1200&&Math.abs(mid.y)<1200,exitHit:Math.abs(bottom.x)<1200&&Math.abs(bottom.y)<1200};}
+function basis(){const az=deg(s.azimuth),e=deg(s.elevation);return {right:xyz(-Math.sin(az),Math.cos(az),0),up:xyz(-Math.sin(e)*Math.cos(az),-Math.sin(e)*Math.sin(az),Math.cos(e))};}
+function projectedCamera(){const b=basis(),t=trace();const corners=[];for(const x of [-1200,1200])for(const y of [-1200,1200])for(const z of [-100,0])corners.push(xyz(x,y,z));corners.push(t.start,t.bottom);const raw=p=>{const z=p.z*s.zStretch;return {x:p.x*b.right.x+p.y*b.right.y+z*b.right.z,y:p.x*b.up.x+p.y*b.up.y+z*b.up.z}};const vals=corners.map(raw);const minX=Math.min(...vals.map(p=>p.x)),maxX=Math.max(...vals.map(p=>p.x)),minY=Math.min(...vals.map(p=>p.y)),maxY=Math.max(...vals.map(p=>p.y));const marginX=75,marginY=75;const scale=Math.max(.015,Math.min((W-2*marginX)/Math.max(200,maxX-minX),(H-2*marginY)/Math.max(200,maxY-minY)))*s.zoom;const centerX=(minX+maxX)/2,centerY=(minY+maxY)/2;return {project:p=>{const v=raw(p);return {x:W/2+(v.x-centerX)*scale,y:H/2-(v.y-centerY)*scale}},scale,b};}
+function label(p,text,color,dx=12,dy=-13){ctx.font='600 12px system-ui,sans-serif';let X=p.x+dx,Y=p.y+dy;const measured=ctx.measureText(text).width;X=clamp(X,6,W-measured-14);Y=clamp(Y,18,H-12);ctx.fillStyle='#091827db';ctx.fillRect(X-5,Y-13,measured+10,19);ctx.fillStyle=color;ctx.fillText(text,X,Y)}
+function drawBackground(){ctx.clearRect(0,0,W,H);ctx.lineWidth=1;ctx.strokeStyle='#5377970d';for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}const glow=ctx.createRadialGradient(W*.54,H*.47,30,W*.54,H*.47,Math.max(W,H)*.6);glow.addColorStop(0,'#4673a10e');glow.addColorStop(1,'#00000000');ctx.fillStyle=glow;ctx.fillRect(0,0,W,H)}
+function drawAxes(camera){const o={x:57,y:H-55},b=camera.b;const axes=[['X',{x:1,y:0,z:0},'#ff9992'],['Y',{x:0,y:1,z:0},'#9efac3'],['Z',{x:0,y:0,z:1},'#9bcbfc']];for(const [n,v,c]of axes){const p={x:o.x+48*(v.x*b.right.x+v.y*b.right.y+v.z*b.right.z),y:o.y-48*(v.x*b.up.x+v.y*b.up.y+v.z*b.up.z)};line(o,p,c,2);circle(p,2.4,c);ctx.fillStyle=c;ctx.font='700 11px ui-monospace,monospace';ctx.fillText(n,p.x+5,p.y+3)}circle(o,3,'#dce6ef')}
+function drawScene(){const t=trace(),cam=projectedCamera(),P=cam.project;drawBackground();
+const a=(x,y,z)=>P(xyz(x,y,z));
+const visibleX=Math.cos(deg(s.azimuth))>=0?1200:-1200;
+const visibleY=Math.sin(deg(s.azimuth))>=0?1200:-1200;
+const zBottom=-100,zTop=0;
+// Bottom silhouette and two visible side walls.
+polygon([a(-1200,-1200,-100),a(1200,-1200,-100),a(1200,1200,-100),a(-1200,1200,-100)],'#26384b99','#476987',1.1);
+const sideX=[a(visibleX,-1200,zTop),a(visibleX,1200,zTop),a(visibleX,1200,zBottom),a(visibleX,-1200,zBottom)];
+const sideY=[a(-1200,visibleY,zTop),a(1200,visibleY,zTop),a(1200,visibleY,zBottom),a(-1200,visibleY,zBottom)];
+polygon(sideX,'#4a729277','#98b7ce',1.35);polygon(sideY,'#365d7f88','#98b7ce',1.35);
+// Draw the silicon midplane through the transparent slab.
+if(s.showMid){polygon([a(-1200,-1200,-50),a(1200,-1200,-50),a(1200,1200,-50),a(-1200,1200,-50)],'#338df91b','#459dff88',1);line(a(visibleX,-1200,-50),a(visibleX,1200,-50),'#5aa6ff',1.5,[6,4]);line(a(-1200,visibleY,-50),a(1200,visibleY,-50),'#5aa6ff',1.5,[6,4])}
+// Silicon top, 48 columns by 192 rows.
+polygon([a(-1200,-1200,0),a(1200,-1200,0),a(1200,1200,0),a(-1200,1200,0)],'#b3d6df23','#a9d6e5',2);
+if(s.showGrid){for(let col=1;col<48;col++){const x=-1200+col*50;line(a(x,-1200,0),a(x,1200,0),col%8===0?'#a3e6f96e':'#aedcfb2a',col%8===0?1:.55)}const ySpacing=12.5*cam.scale;const stride=ySpacing<.75?8:ySpacing<1.5?4:ySpacing<2.5?2:1;for(let row=stride;row<192;row+=stride){const y=-1200+row*12.5;line(a(-1200,y,0),a(1200,y,0),row%16===0?'#a3e6f96c':'#aedcfb24',row%16===0?1:.5)}}
+// A Gaussian-like illustrative charge footprint near the top hit.
+if(t.hit){const xcell=Math.floor((t.top.x+1200)/50),ycell=Math.floor((t.top.y+1200)/12.5);for(let ix=-2;ix<=2;ix++)for(let iy=-5;iy<=5;iy++){const ixp=xcell+ix,iyp=ycell+iy;if(ixp<0||ixp>=48||iyp<0||iyp>=192)continue;const xx=-1200+ixp*50,yy=-1200+iyp*12.5;const ex=(xx+25-t.top.x)/38,ey=(yy+6.25-t.top.y)/22;const w=Math.exp(-.5*(ex*ex+ey*ey));if(w<.035)continue;polygon([a(xx,yy,0),a(xx+50,yy,0),a(xx+50,yy+12.5,0),a(xx,yy+12.5,0)],`rgba(88,238,233,${Math.min(.9,.16+.78*w)})`,null)}}
+// Trajectory is projected from a physical ray; only its display z is stretched.
+const src=P(t.start),top=P(t.top),mid=P(t.mid),bottom=P(t.bottom);
+line(src,bottom,'#ff9b6e91',2,[5,6]);
+const particle=xyz(lerp(t.start.x,t.bottom.x,s.progress),lerp(t.start.y,t.bottom.y,s.progress),lerp(t.start.z,t.bottom.z,s.progress));
+const moving=P(particle);line(src,moving,'#ffac59',3);circle(src,5.5,'#ffba70','#fff0d2');
+if(t.hit){circle(top,8,'#22dbed39');circle(top,4,'#62f5f3','#d4ffff');if(s.showMid&&t.midHit){circle(mid,6,'#4f9aff88','#c6e1ff')}}
+if(s.progress<.999){ctx.shadowColor='#ffad58';ctx.shadowBlur=15;circle(moving,6.5,'#ffc26f','#ffffff');ctx.shadowBlur=0}else{circle(bottom,4,'#ffbf8f')}
+label(src,'particle start','#ffc17c',11,-18);
+if(t.hit)label(top,'surface hit','#80f7f0',11,-16);
+if(s.showMid&&t.midHit)label(mid,'midplane','#9cc9ff',10,21);
+label(a(-1200,visibleY,-100),'100 µm thickness','#d2e5f4',0,25);
+drawAxes(cam);
+}
+function drawRoi(){const w=roi.width,h=roi.height,margin=10,step=(w-2*margin)/16;const t=trace();rctx.fillStyle='#091526';rctx.fillRect(0,0,w,h);const xbase=Math.floor((t.top.x+1200)/50),ybase=Math.floor((t.top.y+1200)/12.5);for(let yi=0;yi<16;yi++)for(let xi=0;xi<16;xi++){let strength=0;if(t.hit){const pixX=xbase+xi-8,pixY=ybase+yi-8;const xc=-1200+(pixX+.5)*50,yc=-1200+(pixY+.5)*12.5;const sx=(xc-t.top.x)/43,sy=(yc-t.top.y)/22;strength=Math.exp(-.5*(sx*sx+sy*sy));}const alpha=.12+.86*strength;rctx.fillStyle=`rgba(${Math.round(30+70*strength)},${Math.round(82+168*strength)},${Math.round(126+95*strength)},${alpha})`;rctx.fillRect(margin+xi*step,margin+yi*step,step-.8,step-.8)}rctx.strokeStyle='#74cbe266';rctx.lineWidth=2;rctx.strokeRect(margin+8*step,margin+8*step,step,step);if(!t.hit){rctx.fillStyle='#a9bbca';rctx.font='18px system-ui';rctx.textAlign='center';rctx.fillText('No top hit',w/2,h/2);rctx.textAlign='left'}}
+const fmt=(v)=>`${Number.isFinite(v)?v.toFixed(1):'—'} µm`;
+function updateData(){const t=trace();el('hitStatus').textContent=t.hit?'HIT':'MISS';el('hitStatus').style.color=t.hit?'#7cf1b2':'#ffc381';const xp=Math.floor((t.top.x+1200)/50),yp=Math.floor((t.top.y+1200)/12.5);el('hitPixel').textContent=t.hit?`(${xp}, ${yp})`:'—';el('hitPosition').textContent=`${fmt(t.top.x)}, ${fmt(t.top.y)}`;el('midPosition').textContent=`${fmt(t.mid.x)}, ${fmt(t.mid.y)}`;el('exitPosition').textContent=`${fmt(t.bottom.x)}, ${fmt(t.bottom.y)}`;el('viewDescription').textContent=`Z shown ×${s.zStretch}`;el('stretchBadge').textContent=`Z display ×${s.zStretch}`;el('zLabel').textContent=`×${s.zStretch}`;el('azLabel').textContent=`${s.azimuth}°`;el('elLabel').textContent=`${s.elevation}°`;el('timeline').value=Math.round(s.progress*100);el('progressLabel').textContent=`${Math.round(s.progress*100)}%`;
+drawScene();drawRoi();}
+function resize(){const r=canvas.getBoundingClientRect();if(!r.width)return;W=r.width;H=r.height;dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);updateData()}
+function stop(){s.animating=false;if(frame!==null){cancelAnimationFrame(frame);frame=null}el('play').textContent='▶ Play'}
+function tick(now){if(!s.animating)return;s.progress=clamp(startProgress+(now-startedAt)/3200,0,1);updateData();if(s.progress>=1){stop();return}frame=requestAnimationFrame(tick)}
+function play(){if(s.animating){stop();return}if(s.progress>=.999)s.progress=0;if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){s.progress=1;updateData();return}s.animating=true;startProgress=s.progress;startedAt=performance.now();el('play').textContent='❚❚ Pause';frame=requestAnimationFrame(tick)}
+function field(id,min,max){const input=el(id);input.addEventListener('change',()=>{let n=Number(input.value);if(!Number.isFinite(n))n=def[id];s[id]=clamp(n,min,max);input.value=String(s[id]);stop();s.progress=1;el('preset').value='manual';updateData()});}
+field('x0',-5000,5000);field('y0',-5000,5000);field('z0',10,5000);field('thetaX',-75,75);field('thetaY',-75,75);
+for(const [id,key] of [['azimuth','azimuth'],['elevation','elevation'],['zStretch','zStretch']])el(id).addEventListener('input',e=>{s[key]=Number(e.target.value);updateData()});
+for(const [id,key] of [['gridToggle','showGrid'],['midToggle','showMid']])el(id).addEventListener('change',e=>{s[key]=e.target.checked;updateData()});
+el('preset').addEventListener('change',()=>{const presets={straight:{x0:-120,y0:15,z0:550,thetaX:0,thetaY:0},angled:{x0:-620,y0:125,z0:600,thetaX:28,thetaY:-8},grazing:{x0:-1000,y0:-600,z0:650,thetaX:60,thetaY:28},miss:{x0:1550,y0:500,z0:550,thetaX:10,thetaY:3}};const preset=presets[el('preset').value];if(!preset)return;Object.assign(s,preset);for(const k of Object.keys(preset))el(k).value=preset[k];stop();s.progress=1;updateData()});
+el('play').addEventListener('click',play);el('restart').addEventListener('click',()=>{stop();s.progress=0;updateData()});
+el('timeline').addEventListener('input',e=>{stop();s.progress=Number(e.target.value)/100;updateData()});
+el('resetView').addEventListener('click',()=>{s.azimuth=35;s.elevation=30;s.zStretch=5;s.zoom=1;for(const k of ['azimuth','elevation','zStretch'])el(k).value=s[k];updateData()});
+let dragging=false,lastX=0,lastY=0;
+canvas.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;s.azimuth=((s.azimuth+dx*.55+180)%360+360)%360-180;s.elevation=clamp(s.elevation-dy*.4,5,85);el('azimuth').value=s.azimuth;el('elevation').value=s.elevation;updateData()});
+const release=()=>{dragging=false};canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
+canvas.addEventListener('wheel',e=>{e.preventDefault();s.zoom=clamp(s.zoom*Math.exp(-e.deltaY*.001),.45,5);updateData()},{passive:false});
+canvas.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(e.key))return;e.preventDefault();if(e.key==='ArrowLeft')s.azimuth=clamp(s.azimuth-5,-180,180);if(e.key==='ArrowRight')s.azimuth=clamp(s.azimuth+5,-180,180);if(e.key==='ArrowUp')s.elevation=clamp(s.elevation+5,5,85);if(e.key==='ArrowDown')s.elevation=clamp(s.elevation-5,5,85);if(e.key==='+')s.zoom=clamp(s.zoom*1.15,.45,5);if(e.key==='-')s.zoom=clamp(s.zoom/1.15,.45,5);el('azimuth').value=s.azimuth;el('elevation').value=s.elevation;updateData()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
+if('ResizeObserver' in window){new ResizeObserver(resize).observe(canvas)}else window.addEventListener('resize',resize);
+resize();
+})();
+</script>
+</body>
+</html>
