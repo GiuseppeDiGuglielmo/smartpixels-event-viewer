@@ -157,15 +157,15 @@ function renderHover() {
   const { pixel, x, y } = mapHover;
   // Position in the axis units: µm, or pixels from the sensor centre.
   const where = state.axisUnits === 'px'
-    ? `x ${(x / SENSOR.pitchX).toFixed(2)}, y ${(y / SENSOR.pitchY).toFixed(2)} px from centre`
-    : `x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm`;
-  if (!pixel) { box.textContent = `${where} · outside the sensor`; return; }
+    ? `x ${(x / SENSOR.pitchX).toFixed(2)}, y ${(y / SENSOR.pitchY).toFixed(2)} px`
+    : `x ${x.toFixed(1)}, y ${y.toFixed(1)} µm`;
+  if (!pixel) { box.textContent = `${where} · outside sensor`; return; }
   let text = `pixel (${pixel.x}, ${pixel.y}) · ${where}`;
-  if (state.mode === 'data' && state.charge) {
+  if (state.charge) {
     const i = pixel.y * SENSOR.pixelsX + pixel.x;
     const q = state.charge.rawDense[i];
     const hidden = q && !state.charge.dense[i] ? ' (below threshold)' : '';
-    text += `\npixelAV charge, slice ${state.charge.slice}: ${q ? `${Math.round(q * 10) / 10} e⁻` : '0 e⁻'}${hidden}`;
+    text += ` · ${q ? (Math.round(q * 10) / 10).toLocaleString('en-US') : 0} e⁻${hidden}`;
   }
   box.textContent = text;
 }
@@ -179,6 +179,32 @@ function bindSegment(id, onPick) {
     const value = event.target.closest('button')?.dataset.value;
     if (value) onPick(value);
   });
+}
+
+/** Apply a wheel, drag or keyboard view of the map; null returns to the full sensor. */
+function setMapWindow(win) {
+  state.mapZoom = win;
+  if (!win) state.mapFit = 'full';
+  setSegment('mapFit', win ? 'custom' : state.mapFit); // neither framing button is active on a custom view
+  syncUrl();
+  drawMap();
+}
+
+/** Keyboard equivalents of wheel zoom and drag. Returns true when the key was used. */
+function mapKey(key) {
+  const t = mapTransformUsed;
+  if (!t) return false;
+  if (key === '0') { setMapWindow(null); return true; }
+  if (key === '+' || key === '=' || key === '-') {
+    const px = t.pad.left + (t.width - t.pad.left - t.pad.right) / 2;
+    const py = t.pad.top + (t.height - t.pad.top - t.pad.bottom) / 2;
+    setMapWindow(zoomWindow(t, px, py, key === '-' ? 1 / 1.25 : 1.25));
+    return true;
+  }
+  const move = { ArrowLeft: [60, 0], ArrowRight: [-60, 0], ArrowUp: [0, 60], ArrowDown: [0, -60] }[key];
+  if (!move || !canPan(t)) return false; // nothing to move: leave the key to the page
+  setMapWindow(panWindow(t, move[0], move[1]));
+  return true;
 }
 
 /** Mirror the display choices into the URL so a link reopens the same view. */
@@ -210,7 +236,6 @@ function setView(view) {
   frame.dataset.view = state.view;
   document.body.dataset.view = state.view;
   setSegment('viewSwitch', state.view);
-  el('viewTag').textContent = state.view === '2d' ? '2D' : '3D';
   el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
   syncLegacyControls();
   syncUrl();
@@ -371,12 +396,8 @@ function bindControls() {
     const rect = mapCanvas.getBoundingClientRect();
     mapPointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
-    state.mapZoom = zoomWindow(mapTransformUsed, mapPointer.x, mapPointer.y, Math.exp(-pixels * 0.0015));
-    if (!state.mapZoom) state.mapFit = 'full'; // fully zoomed out
-    setSegment('mapFit', state.mapZoom ? 'custom' : state.mapFit); // neither framing button is active while zoomed
-    syncUrl();
     mapHover = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
-    drawMap();
+    setMapWindow(zoomWindow(mapTransformUsed, mapPointer.x, mapPointer.y, Math.exp(-pixels * 0.0015)));
   }, { passive: false });
   mapCanvas.addEventListener('pointerleave', () => { if (mapDrag) return; mapHover = null; mapPointer = null; drawMap(); });
 
@@ -425,10 +446,11 @@ function bindControls() {
   // Keyboard orbit/zoom on the viewport (both renderers).
   frame.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', ' '].includes(event.key)) return;
-    if (state.view === '2d' && event.key !== ' ') return; // the 2D view has no camera: leave keys to the page
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '0', ' '].includes(event.key)) return;
+    if (event.key === ' ') { event.preventDefault(); play(); return; }
+    if (state.view === '2d') { if (mapKey(event.key)) event.preventDefault(); return; }
+    if (event.key === '0') return;
     event.preventDefault();
-    if (event.key === ' ') { play(); return; }
     const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180;
     if (event.key === 'ArrowLeft') state.azimuth = wrap(state.azimuth - 5);
     if (event.key === 'ArrowRight') state.azimuth = wrap(state.azimuth + 5);

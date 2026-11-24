@@ -53,7 +53,7 @@ const formatCharge = (q) => {
 /**
  * Legend for an event's signed charge range [minQ ≤ 0, maxQ]: a CSS gradient
  * and ticks at the two ends, zero and the decades between them. `at` is the
- * 0..100 % position along the bar, which is linear in signed log level.
+ * 0..100 % position from the bottom of the bar, linear in signed log level.
  */
 export function chargeLegend(minQ, maxQ, floor = 10, minGap = 7) {
   const negative = chargeLevel(-minQ, maxQ, floor);
@@ -76,7 +76,7 @@ export function chargeLegend(minQ, maxQ, floor = 10, minGap = 7) {
     }
   }
   return {
-    gradient: `linear-gradient(90deg, ${stops.join(', ')})`,
+    gradient: `linear-gradient(0deg, ${stops.join(', ')})`,
     ticks: ticks.sort((a, b) => a.at - b.at).map((t) => ({ ...t, text: formatCharge(t.q) })),
   };
 }

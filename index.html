@@ -17,23 +17,25 @@
   </script>
 </head>
 <body data-view="2d" data-mode="data-pending">
-<header>
-<div class="eyebrow">Interactive detector geometry</div>
-<h1>Particle → Pixel Sensor</h1>
-<p class="subtitle">A straight particle track through one 48 × 192 group of silicon pixels (50 × 12.5 µm, 100 µm thick). Geometry is computed in physical µm; pixel charge comes only from pixelAV simulated events.</p>
+<header class="topbar">
+<div class="brand"><h1>Pixel Sensor</h1><span class="spec">48 × 192 pixels · 50 × 12.5 µm · 100 µm thick</span></div>
+<div class="topbar-actions">
+<div class="seg" role="group" aria-label="View" id="viewSwitch"><button type="button" id="view2d" data-value="2d" aria-pressed="true">2D</button><button type="button" id="view3d" data-value="3d" aria-pressed="false">3D</button></div>
+<button type="button" id="savePng" title="Save the current view as a PNG image">Save PNG</button>
+</div>
 </header>
 <main>
-<div class="left">
 <section class="viewport-panel" aria-label="Sensor view">
-<div class="viewport-head">
-<span class="live-tag">● <span id="viewTag">2D</span><span class="view-3d"> · <span id="rendererBadge">loading…</span></span></span>
-<div class="seg" role="group" aria-label="View" id="viewSwitch"><button type="button" id="view2d" data-value="2d" aria-pressed="true">2D</button><button type="button" id="view3d" data-value="3d" aria-pressed="false">3D</button></div>
+<div class="toolbar">
 <div class="seg view-2d" role="group" aria-label="Map area" id="mapFit"><button type="button" data-value="full" aria-pressed="true">Full sensor</button><button type="button" data-value="track" aria-pressed="false">Zoom to track</button></div>
 <div class="seg view-2d" role="group" aria-label="Axis units" id="axisUnits"><button type="button" data-value="um" aria-pressed="true">µm</button><button type="button" data-value="px" aria-pressed="false">pixels</button></div>
-<button type="button" id="savePng" class="head-action">Save PNG</button>
+<div class="map-hover view-2d" id="mapHover"></div>
+<span class="renderer-tag view-3d" id="rendererBadge">loading…</span>
 </div>
-<div class="canvas-frame" id="frame" tabindex="-1" data-view="2d"><canvas id="scene" tabindex="0" aria-label="Rotatable 2D-canvas projection of the pixel sensor (fallback renderer). Drag to orbit, wheel to zoom."></canvas><canvas id="map2d" class="map2d" tabindex="0" role="img" aria-label="2D top view of the 48 by 192 pixel array with the track and its surface, midplane and exit crossings"></canvas><div class="map-hover" id="mapHover" aria-live="polite"></div><div class="no-event" id="noEvent" role="status">Loading pixelAV data…</div><div class="overlay"><span class="pill">2.4 × 2.4 mm</span><span class="pill">9,216 pixels</span><span class="pill" id="stretchBadge">Z display ×5</span></div><div class="canvas-tip" id="canvasTip">Drag orbit · right-drag pan · scroll zoom</div></div>
-<div class="legend data-only"><div class="charge-legend"><span class="charge-title">pixelAV charge (e⁻, log scale, per event)</span><div class="charge-scale"><i id="chargeRampLegend"></i><div class="charge-ticks" id="chargeTicks"></div></div></div></div>
+<div class="stage">
+<div class="canvas-frame" id="frame" tabindex="-1" data-view="2d"><canvas id="scene" tabindex="0" aria-label="Rotatable 2D-canvas projection of the pixel sensor (fallback renderer). Drag to orbit, wheel to zoom."></canvas><canvas id="map2d" class="map2d" tabindex="0" role="img" aria-label="2D top view of the 48 by 192 pixel array. Plus and minus zoom, arrow keys move the view, 0 shows the full sensor, space plays."></canvas><div class="no-event" id="noEvent" role="status">Loading pixelAV data…</div><div class="overlay"><span class="pill">2.4 × 2.4 mm</span><span class="pill">9,216 pixels</span><span class="pill" id="stretchBadge">Z display ×5</span></div><div class="canvas-tip" id="canvasTip">Drag orbit · right-drag pan · scroll zoom</div></div>
+<div class="colorbar data-only" title="pixelAV simulated charge in electrons, signed log scale, fixed per event"><i id="chargeRampLegend"></i><div class="charge-ticks" id="chargeTicks"></div><span class="colorbar-title">pixelAV charge (e⁻, log)</span></div>
+</div>
 <div class="transport">
 <div class="t-actions"><button class="primary" type="button" id="play">▶ Play</button><button type="button" id="restart">↺ Restart</button></div>
 <button type="button" id="playSlices" hidden>▶ Charge vs time</button>
@@ -44,41 +46,40 @@
 <input id="sliceInput" class="data-only" type="range" min="0" max="19" value="19" step="1" aria-label="Charge time slice">
 <span class="progress" id="progressLabel">100%</span>
 <span class="progress t-slice data-only" id="sliceLabel">slice 19 / 19</span>
-<label class="check inline t-loop"><input id="loopToggle" type="checkbox">Loop</label>
+<label class="check t-loop"><input id="loopToggle" type="checkbox"><span>Loop</span></label>
 </div>
 </section>
-<section class="detail-panel event-panel" id="eventPanel" hidden><p class="detail-title">pixelAV simulated event · truth &amp; collected charge</p><div class="results" id="eventReadout"></div><p class="detail-note">Charge = pixelAV simulation output (electrons, cumulative over 20 time slices) loaded from the converted dataset. The drawn line is the truth straight track; the charge is <b>pixelAV simulated</b>. Origin convention for pixelAV (x, y): centre of pixel (23, 95) — see docs/PIXELAV_DATA.md.</p></section>
-<div class="bottom-grid data-only">
-<section class="detail-panel"><p class="detail-title">Track crossings</p><div class="results crossings">
-<div class="metric"><label><i class="dot cyan"></i>Surface (z = 0)</label><strong id="hitPosition">—</strong></div>
-<div class="metric"><label><i class="dot mid"></i>Midplane (z = −50 µm)</label><strong id="midPosition">—</strong></div>
-<div class="metric"><label><i class="dot exit"></i>Exit (z = −100 µm)</label><strong id="exitPosition">—</strong></div>
-<div class="metric"><label>Surface hit</label><strong id="hitStatus" class="good">HIT</strong></div>
-<div class="metric"><label>Silicon volume · entry → exit face</label><strong id="volumePath">—</strong></div>
-<div class="metric"><label>Path in silicon · pixels crossed</label><strong id="volumeLength">—</strong></div>
-</div><p class="detail-note">Straight, deterministic line (no field, scattering or energy loss). Pixels are zero-based (x 0–47, y 0–191). <b>HIT</b> means the track crosses the top face; side entry is reported in the volume row. <span class="data-only">Pixel colours show <b>pixelAV simulated</b> charge for the loaded event; the line is its truth track.</span></p></section>
-</div>
-</div>
-<aside class="control-panel">
-<div class="section"><h2>Data</h2><div class="fields"><div class="field wide"><label for="dataMode">Source</label><select id="dataMode"><option value="data">pixelAV simulated events</option></select></div></div>
-<div id="dataControls"><p class="help">Dataset: <b id="dataDataset">—</b></p><div class="fields"><div class="field wide"><label for="dataFile">File</label><select id="dataFile"></select></div>
-<div class="field"><label for="eventIndex">Event #</label><input type="number" id="eventIndex" value="0" min="0" step="1"></div><div class="field event-nav"><label>&nbsp;</label><div><button type="button" id="eventPrev" aria-label="Previous event">◀</button><button type="button" id="eventNext" aria-label="Next event">▶</button><button type="button" id="eventRandom" aria-label="Random event">⤨</button></div></div>
-<div class="field"><label for="threshold" title="Pixels with |charge| at or below this value are not drawn. Totals and the data are unchanged.">Threshold |q| (e⁻)</label><input type="number" id="threshold" value="0" min="0" step="100"></div></div>
-</div>
-<p id="dataStatus" class="data-status"></p></div>
-<div class="section data-only"><h2>Track</h2><p class="help">Starts at (x₀, y₀, z₀) above the sensor and moves down with x(z) = x₀ + (z₀ − z)·tan θX (same for y).</p><div class="fields"><div class="field"><label for="x0">x₀ (µm)</label><input type="number" id="x0" value="-620" min="-5000" max="5000" step="50"></div><div class="field"><label for="y0">y₀ (µm)</label><input type="number" id="y0" value="125" min="-5000" max="5000" step="25"></div>
-<div class="field"><label for="thetaX">θX (°)</label><input type="number" id="thetaX" value="28" min="-75" max="75" step="1"></div><div class="field"><label for="thetaY">θY (°)</label><input type="number" id="thetaY" value="-8" min="-75" max="75" step="1"></div>
-<div class="field"><label for="z0">z₀ above top (µm)</label><input type="number" id="z0" value="600" min="10" max="5000" step="50"></div></div></div>
-<div class="section"><h2>Show</h2>
-<div class="show-group"><h3>Trajectory</h3><label class="check" title="The straight path before it enters the silicon, and after a side exit"><input id="trackOffToggle" type="checkbox"><i class="dot"></i>Outside the sensor</label><label class="check" title="The straight path through the 100 µm of silicon"><input id="trackInToggle" type="checkbox"><i class="dot hot"></i>Inside the sensor</label></div>
-<div class="show-group"><h3>Crossing points</h3><label class="check" title="Where the track crosses the top surface, with its pixel"><input id="markTop" type="checkbox"><i class="dot cyan"></i>Surface <span class="tick-note">z = 0</span></label><label class="check" title="Where the track crosses the midplane, with its pixel"><input id="markMid" type="checkbox"><i class="dot mid"></i>Midplane <span class="tick-note">z = −50 µm</span></label><label class="check" title="Where the track crosses the bottom plane, with its pixel"><input id="markExit" type="checkbox"><i class="dot exit"></i>Exit <span class="tick-note">z = −100 µm</span></label></div>
-<div class="show-group"><h3>Pixels</h3><label class="check" title="Pixel boundaries and the x = 0, y = 0 axes"><input id="gridToggle" type="checkbox" checked>Grid and central axes</label><label class="check" title="Pixels the in-silicon path passes through (geometric, not charge)"><input id="traversedToggle" type="checkbox"><i class="dot trav"></i>Crossed by the track</label></div>
-<p class="help view-2d">Scroll over the map to zoom, drag to move it when zoomed in. Hover a pixel for its index, position and charge.</p></div>
-<div class="section view-3d"><h2>3D scene</h2><label class="check"><input id="midToggle" type="checkbox" checked>Midplane sheet</label><label class="check data-only"><input id="barsToggle" type="checkbox" checked>Charge bars (height ∝ e⁻)</label><label class="check"><input id="labelsToggle" type="checkbox" checked>Text labels</label><div class="fields sub"><div class="field wide"><label for="azimuth">Orbit angle <b id="azLabel">35°</b></label><input type="range" id="azimuth" min="-180" max="180" value="35" step="1"></div><div class="field wide"><label for="elevation">Elevation <b id="elLabel">30°</b></label><input type="range" id="elevation" min="-89" max="89" value="30" step="1"></div><div class="field wide"><label for="zStretch">Z exaggeration (display only) <b id="zLabel">×5</b></label><input type="range" id="zStretch" min="1" max="12" value="5" step="1"></div></div>
-<div class="view-buttons"><button type="button" id="viewTop">Top</button><button type="button" id="viewSideX">Side X–Z</button><button type="button" id="viewSideY">Side Y–Z</button><button type="button" id="viewFocus">Focus impact</button><button type="button" id="resetView" class="span2">Reset camera</button></div></div>
+<aside class="control-panel" aria-label="Controls">
+<section class="section"><h2>Event</h2>
+<label class="field-label" for="dataFile">File</label><select id="dataFile"></select>
+<div class="event-nav"><button type="button" id="eventPrev" aria-label="Previous event" title="Previous event">◀</button><input type="number" id="eventIndex" value="0" min="0" step="1" aria-label="Event number"><button type="button" id="eventNext" aria-label="Next event" title="Next event">▶</button><button type="button" id="eventRandom" aria-label="Random event" title="Random event">⤨</button></div>
+<div class="summary data-only"><div><span>Charge</span><b id="sumCharge">—</b></div><div><span>Pixels</span><b id="sumPixels">—</b></div><div><span>cotα · cotβ</span><b id="sumAngles">—</b></div></div>
+<p id="dataStatus" class="data-status"></p></section>
+<section class="section"><h2>Show</h2>
+<div class="show-group"><h3>Trajectory</h3><label class="check" title="The straight path before it enters the silicon, and after a side exit"><input id="trackOffToggle" type="checkbox"><i class="dot"></i><span>Outside the sensor</span></label><label class="check" title="The straight path through the 100 µm of silicon"><input id="trackInToggle" type="checkbox"><i class="dot hot"></i><span>Inside the sensor</span></label></div>
+<div class="show-group"><h3>Crossing points</h3><label class="check" title="Where the track crosses the top surface, with its pixel"><input id="markTop" type="checkbox"><i class="dot cyan"></i><span>Surface <small>z = 0</small></span></label><label class="check" title="Where the track crosses the midplane, with its pixel"><input id="markMid" type="checkbox"><i class="dot mid"></i><span>Midplane <small>z = −50 µm</small></span></label><label class="check" title="Where the track crosses the bottom plane, with its pixel"><input id="markExit" type="checkbox"><i class="dot exit"></i><span>Exit <small>z = −100 µm</small></span></label></div>
+<div class="show-group"><h3>Pixels</h3><label class="check" title="Pixel boundaries and the x = 0, y = 0 axes"><input id="gridToggle" type="checkbox" checked><i class="dot-space"></i><span>Grid and central axes</span></label><label class="check" title="Pixels the in-silicon path passes through (geometric, not charge)"><input id="traversedToggle" type="checkbox"><i class="dot trav"></i><span>Crossed by the track</span></label>
+<label class="threshold" for="threshold" title="Pixels with |charge| at or below this value are not drawn. Totals and the data are unchanged."><span>Hide |q| ≤</span><input type="number" id="threshold" value="0" min="0" step="100"><span>e⁻</span></label></div>
+</section>
+<section class="section view-3d"><h2>3D scene</h2><label class="check"><input id="midToggle" type="checkbox" checked><span>Midplane sheet</span></label><label class="check data-only"><input id="barsToggle" type="checkbox" checked><span>Charge bars (height ∝ e⁻)</span></label><label class="check"><input id="labelsToggle" type="checkbox" checked><span>Text labels</span></label>
+<div class="slider"><label for="azimuth">Orbit angle <b id="azLabel">35°</b></label><input type="range" id="azimuth" min="-180" max="180" value="35" step="1"></div><div class="slider"><label for="elevation">Elevation <b id="elLabel">30°</b></label><input type="range" id="elevation" min="-89" max="89" value="30" step="1"></div><div class="slider"><label for="zStretch">Z exaggeration (display only) <b id="zLabel">×5</b></label><input type="range" id="zStretch" min="1" max="12" value="5" step="1"></div>
+<div class="view-buttons"><button type="button" id="viewTop">Top</button><button type="button" id="viewSideX">Side X–Z</button><button type="button" id="viewSideY">Side Y–Z</button><button type="button" id="viewFocus">Focus impact</button><button type="button" id="resetView" class="span2">Reset camera</button></div></section>
+<details class="section" id="eventPanel" hidden><summary>Event details</summary><div class="results" id="eventReadout"></div></details>
+<details class="section data-only"><summary>Track</summary><div class="results">
+<div class="metric"><label>Surface hit</label><strong id="hitStatus" class="good">—</strong></div><div class="metric"><label><i class="dot cyan"></i>Surface (z = 0)</label><strong id="hitPosition">—</strong></div><div class="metric"><label><i class="dot mid"></i>Midplane (z = −50 µm)</label><strong id="midPosition">—</strong></div><div class="metric"><label><i class="dot exit"></i>Exit (z = −100 µm)</label><strong id="exitPosition">—</strong></div><div class="metric"><label>Entry → exit face</label><strong id="volumePath">—</strong></div><div class="metric"><label>Path in silicon</label><strong id="volumeLength">—</strong></div>
+<div class="metric"><label>Start x₀, y₀</label><strong><output id="x0">—</output>, <output id="y0">—</output> µm</strong></div>
+<div class="metric"><label>Angles θX, θY</label><strong><output id="thetaX">—</output>°, <output id="thetaY">—</output>°</strong></div>
+<div class="metric"><label for="z0" title="Start height above the surface. Display only: the truth line is fixed.">Start height z₀ (µm)</label><input type="number" id="z0" value="600" min="10" max="5000" step="50"></div>
+</div></details>
+<details class="section"><summary>About this view</summary><div class="about">
+<p>Dataset: <b id="dataDataset">—</b></p>
+<p>Charge is <b>pixelAV simulated</b> output in electrons, cumulative over 20 time slices. The line is the event's truth track: straight, with no field, scattering or energy loss.</p>
+<p>Pixel addresses are zero-based (x 0–47, y 0–191). The pixel axis counts from the sensor centre. pixelAV (x, y) origin: centre of pixel (23, 95), see <code>docs/PIXELAV_DATA.md</code>.</p>
+<p>Keys on the map: <kbd>+</kbd> <kbd>−</kbd> zoom, arrows move, <kbd>0</kbd> full sensor, <kbd>Space</kbd> play.</p>
+<p>Links: <code>?view=3d</code>, <code>units=px</code>, <code>fit=track</code>, <code>renderer=2d</code>.</p>
+</div></details>
 </aside>
 </main>
-<p class="footer">X pixel index 0–47, Y index 0–191, zero-based. URL options: <code>?view=3d</code> opens the 3D scene (Three.js r187, vendored, MIT; <code>&amp;renderer=2d</code> for the original canvas renderer), <code>units=px</code> labels the 2D axes in pixels from the sensor centre, <code>fit=track</code> zooms the 2D view to the track. The original single-file demo is in <code>legacy/</code>.</p>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

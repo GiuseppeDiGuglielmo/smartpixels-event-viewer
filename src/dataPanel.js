@@ -88,7 +88,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     el('chargeRampLegend').style.background = gradient;
     el('chargeTicks').replaceChildren(...ticks.map(({ at, text }) => {
       const tick = document.createElement('span');
-      tick.style.left = `${at}%`;
+      tick.style.bottom = `${at}%`;
       tick.textContent = text;
       return tick;
     }));
@@ -101,18 +101,19 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     const t = ev.truth;
     const c = state.charge;
     const rows = [
-      ['Event', `${ev.file.split}/${ev.file.name} #${ev.eventIndex}`],
-      ['cotα · cotβ', `${fmt(t.cotAlpha, 3)} · ${fmt(t.cotBeta, 3)}`],
       ['pT (truth column)', fmt(t.pt, 4)],
       ['e–h pairs (truth)', fmt(t.number_eh_pairs, 0)],
-      [`Σ q>0 @ slice ${c?.slice ?? '—'}`, c ? `${fmt(c.stats.total, 0)} e⁻ (${fmt((100 * c.stats.total) / (c.finalTotal || 1), 0)} %)` : '—'],
+      ['Share of final charge', c ? `${fmt((100 * c.stats.total) / (c.finalTotal || 1), 0)} %` : '—'],
       ['Net charge (all entries)', c ? `${fmt(c.stats.net, 0)} e⁻` : '—'],
-      [`Pixels shown (|q| > ${state.threshold} e⁻)`, c ? String(c.stats.nAbove) : '—'],
       ['Max pixel', c ? `${fmt(c.stats.max, 0)} e⁻` : '—'],
       ['offset1 · offset2', `${fmt(t.offset1, 0)} · ${fmt(t.offset2, 0)}`],
       ['at edge (orig · uncent.)', `${bool(t.original_atEdge)} · ${bool(t.uncentered_atEdge)}`],
       ['truth entry (pixelAV)', `${fmt(t['x-entry'], 1)}, ${fmt(t['y-entry'], 1)} µm`],
     ];
+    // The three numbers used to compare events stay visible; the rest is in Event details.
+    el('sumCharge').textContent = c ? `${Math.round(c.stats.total).toLocaleString('en-US')} e⁻` : '—';
+    el('sumPixels').textContent = c ? String(c.stats.nAbove) : '—';
+    el('sumAngles').textContent = `${fmt(t.cotAlpha, 2)} · ${fmt(t.cotBeta, 2)}`;
     el('eventReadout').replaceChildren(...rows.map(([label, value]) => {
       const div = document.createElement('div');
       div.className = 'metric';
@@ -172,8 +173,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       el('eventIndex').value = String(index);
       el('eventIndex').max = String(file.events - 1);
       state.progress = 1;
-      const kb = (src.stats.bytes / 1024).toFixed(0);
-      setStatus(`pixelAV simulated event loaded · ${src.cacheSizes().events} cached · ${kb} KB fetched this session`, 'ok');
+      setStatus(''); // loaded: nothing to report
       writeUrl();
       renderReadout();
       update();
@@ -183,15 +183,6 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       setStatus(`${error.message}${hint}`, 'error');
       update();
     }
-  }
-
-  /** Track values come from the loaded event; only the display start height z0 is editable. */
-  function lockParticleInputs() {
-    for (const id of ['x0', 'y0', 'thetaX', 'thetaY']) {
-      el(id).disabled = true;
-      el(id).title = 'Set by the pixelAV truth of the loaded event';
-    }
-    el('z0').title = 'Start height above the surface (display only; the truth line is fixed)';
   }
 
   /** Animation range inside the silicon, over which locked slices are spread. */
@@ -317,7 +308,6 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       applyParticle(truthToParticle(state.event.truth, state.dataZ0));
       update();
     });
-    lockParticleInputs();
     const params = new URLSearchParams(location.search);
     loadEvent(params.get('file'), Number(params.get('event') ?? 0));
   }

@@ -1,6 +1,6 @@
 {
   "name": "pixel-sensor-simulator",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Interactive 48 × 192 silicon pixel sensor viewer: straight-line track geometry plus pixelAV simulated events (Three.js r187 vendored, no npm install)",
   "type": "module",
