@@ -5,7 +5,7 @@
  * Data come from scripts/pixelav_convert.py (format "pixelav-sparse-v1").
  * Charge values are pixelAV SIMULATED electrons, cumulative over time slices.
  * This is real simulation output; it is the only charge the viewer shows
- * (demo mode is geometry only).
+ * (pixelAV is the only data source).
  *
  * Coordinate conventions (verified on test/part.0, see docs/PIXELAV_DATA.md):
  *  - pixel index p = iy*48 + ix (same zero-based ix/iy as geometry.js; no transpose)
@@ -142,22 +142,39 @@ export function sliceToDense(slice, out = new Float32Array(SENSOR.pixelsX * SENS
 export const pixelOfIndex = (p) => ({ x: p % SENSOR.pixelsX, y: Math.floor(p / SENSOR.pixelsX) });
 
 /**
+ * The entries of a sparse slice that are displayed: |q| > threshold, for
+ * negative and positive charge alike. Display only; the data is not changed.
+ */
+export function applyThreshold(slice, threshold = 0) {
+  if (!(threshold > 0)) return slice;
+  const keep = [];
+  for (let i = 0; i < slice.charges.length; i++) if (Math.abs(slice.charges[i]) > threshold) keep.push(i);
+  return {
+    ...slice,
+    indices: slice.indices.constructor.from(keep, (i) => slice.indices[i]),
+    charges: slice.charges.constructor.from(keep, (i) => slice.charges[i]),
+  };
+}
+
+/**
  * Charge statistics of one slice: total (Σ of positive entries), net (Σ of all
- * entries, incl. small negative values), number of pixels above `threshold`
- * electrons, maximum, and the charge-weighted centroid (viewer µm, using
+ * entries, incl. small negative values), number of pixels with |q| above `threshold`
+ * electrons, maximum, minimum (≤ 0), and the charge-weighted centroid (viewer µm, using
  * pixel centres; negative values ignored).
  */
 export function chargeStats(slice, threshold = 0) {
   let total = 0;
   let net = 0;
   let max = 0;
+  let min = 0;
   let above = 0;
   let sx = 0;
   let sy = 0;
   for (let i = 0; i < slice.indices.length; i++) {
     const q = slice.charges[i];
     net += q;
-    if (q > threshold) above++;
+    if (q < min) min = q;
+    if (Math.abs(q) > threshold) above++;
     if (q <= 0) continue;
     const { x, y } = pixelOfIndex(slice.indices[i]);
     const c = pixelCenter(x, y);
@@ -167,7 +184,25 @@ export function chargeStats(slice, threshold = 0) {
     if (q > max) max = q;
   }
   const centroid = total > 0 ? { x: sx / total, y: sy / total } : null;
-  return { total, net, max, nAbove: above, centroid, centroidPixel: centroid ? pixelAt(centroid.x, centroid.y) : null };
+  return { total, net, max, min, nAbove: above, centroid, centroidPixel: centroid ? pixelAt(centroid.x, centroid.y) : null };
+}
+
+/**
+ * Display link between the particle animation and the charge time slices.
+ * The n slices are spread over the part of the animation inside the silicon,
+ * [enter, leave] in progress units; before `enter` no charge is shown (null).
+ * This is a display mapping, not a physical time axis.
+ */
+export function lockedSlice(progress, enter, leave, n) {
+  if (progress < enter) return null;
+  if (!(leave > enter)) return n - 1;
+  const t = Math.round(((progress - enter) / (leave - enter)) * (n - 1));
+  return Math.min(n - 1, Math.max(0, t));
+}
+
+/** Animation progress at which `lockedSlice` first shows the centre of slice t. */
+export function lockedProgress(t, enter, leave, n) {
+  return n > 1 ? enter + (t / (n - 1)) * (leave - enter) : leave;
 }
 
 /** pixelAV truth (x, y) → viewer µm. */

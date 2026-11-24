@@ -1,13 +1,12 @@
 import {
   SENSOR, clamp, degreesToRadians as deg, point, lerp,
-  traceParticle,
+  traceParticle, intersectVolume, trackSegments, pointAtProgress,
 } from './geometry.js';
 import { chargeColor, pixelShading } from './chargeColors.js';
 
 /**
  * LEGACY / FALLBACK renderer: dependency-free 3D-looking orthographic
  * rendering on a 2D canvas, used when WebGL is unavailable or ?renderer=2d.
- * The ROI panel is drawn by roiPanel.js.
  * The sensor and ray are first expressed in physical 3D coordinates; only
  * the projection is 2D. Z exaggeration is visual, never physical.
  */
@@ -197,7 +196,7 @@ export function createRenderer({ canvas, getState }) {
       const px = SENSOR.pitchX;
       const py = SENSOR.pitchY;
       for (let i = 0; i < indices.length; i++) {
-        if (!(charges[i] > 0)) continue;
+        if (!charges[i]) continue; // negative charge is drawn too
         const [r, g, b] = chargeColor(charges[i], s.charge.scale);
         const x = -H + (indices[i] % SENSOR.pixelsX) * px;
         const y = -K + Math.floor(indices[i] / SENSOR.pixelsX) * py;
@@ -209,31 +208,35 @@ export function createRenderer({ canvas, getState }) {
     const top = P(t.top);
     const mid = P(t.mid);
     const bottom = P(t.bottom);
-    line(src, bottom, '#ff9b6e91', 2, [5, 6]);
     const fraction = s.progress;
+    for (const seg of trackSegments(t, intersectVolume(s))) {
+      if (!(seg.kind === 'in' ? s.showTrackIn : s.showTrackOff)) continue;
+      const from = P(pointAtProgress(t, seg.from));
+      line(from, P(pointAtProgress(t, seg.to)), '#ff9b6e91', 2, [5, 6]);
+      if (fraction > seg.from) line(from, P(pointAtProgress(t, Math.min(fraction, seg.to))), seg.kind === 'in' ? '#fff0a0' : '#ffac59', 3);
+    }
     const moving = P(point(
       lerp(t.start.x, t.bottom.x, fraction),
       lerp(t.start.y, t.bottom.y, fraction),
       lerp(t.start.z, t.bottom.z, fraction),
     ));
-    line(src, moving, '#ffac59', 3);
-    circle(src, 5.5, '#ffba70', '#fff0d2');
-    if (t.hit) {
+    if (s.showTrackOff) circle(src, 5.5, '#ffba70', '#fff0d2');
+    if (t.hit && s.markTop) {
       circle(top, 8, '#22dbed39');
       circle(top, 4, '#62f5f3', '#d4ffff');
-      if (s.showMid && t.midHit) circle(mid, 6, '#4f9aff88', '#c6e1ff');
     }
+    if (t.hit && s.markMid && t.midHit) circle(mid, 6, '#4f9aff88', '#c6e1ff');
     if (fraction < 0.999) {
       ctx.shadowColor = '#ffad58';
       ctx.shadowBlur = 15;
       circle(moving, 6.5, '#ffc26f', '#ffffff');
       ctx.shadowBlur = 0;
-    } else {
+    } else if (s.markExit) {
       circle(bottom, 4, '#ffbf8f');
     }
-    label(src, 'particle start', '#ffc17c', 11, -18);
-    if (t.hit) label(top, 'surface hit', '#80f7f0', 11, -16);
-    if (s.showMid && t.midHit) label(mid, 'midplane', '#9cc9ff', 10, 21);
+    if (s.showTrackOff) label(src, 'particle start', '#ffc17c', 11, -18);
+    if (t.hit && s.markTop) label(top, 'surface hit', '#80f7f0', 11, -16);
+    if (t.hit && s.markMid && t.midHit) label(mid, 'midplane', '#9cc9ff', 10, 21);
     label(a(-H, visibleY, -100), '100 µm thickness', '#d2e5f4', 0, 25);
     axes(camera);
   }

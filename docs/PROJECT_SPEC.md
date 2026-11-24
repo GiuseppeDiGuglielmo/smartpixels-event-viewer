@@ -22,7 +22,7 @@ The source of the geometry is `assets/reference-geometry.png`. This project repr
 - ROI is 16 × 16 pixels, which corresponds to **800 µm along X and 200 µm along Y**. Two placements (`roiWindow` in geometry.js):
   - `centered`: the hit pixel sits at local (8, 8). Near the array edge the window shifts inward, so it always stays inside 0..47 × 0..191.
   - `aligned`: the containing tile of the fixed 3 × 12 tiling (x0 ∈ {0, 16, 32}, y0 ∈ {0, 16, …, 176}).
-  The ROI panel is an *index-space display* (cells drawn square, +y up). This does not represent physical aspect ratio; the 3D view draws the ROI at true physical size.
+  These helpers are kept in geometry.js for later analysis; the viewer no longer draws an ROI.
 
 ## 2. Particle motion
 
@@ -41,19 +41,19 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 ## 3. User experience (implemented)
 
 - Volumetric translucent slab (WebGL) with a 48 × 192 pixel-pad texture and grid on top, midplane, backside, axis triad, and edge index labels.
-- Control particle origin and direction; presets.
+- Track origin and direction come from the loaded pixelAV event's truth; only the display start height z₀ is editable.
 - Orbit, pan and zoom camera (OrbitControls), synced with the sliders and keyboard. View presets: top, side X–Z, side Y–Z, focus impact, reset.
 - Play, pause, loop and seek the particle path. Top impact, midplane crossing and exit markers, with their pixels, appear as the particle reaches each plane.
-- 16 × 16 ROI toggle (centered or aligned tile); pixels crossed by the track; label toggle.
-- 2D pixel map (true-aspect top view of the whole array, the default view) with toggleable markers for the surface, midplane and exit crossings, a hover readout, full-sensor (default) or zoom-to-track framing, and axis labels in µm or pixel index (v0.5.0).
+- Pixels crossed by the track; label toggle.
+- 2D view (true-aspect top view of the whole array, the default) with highlighted central axes with toggleable markers for the surface, midplane and exit crossings, a hover readout, full-sensor (default) or zoom-to-track framing, and axis labels in µm or pixels from the sensor centre (v0.6.0).
 - Readouts: top/mid/bottom positions and pixel addresses, volume entry→exit faces and chord, number of pixels crossed.
-- PNG export of the current view (3D scene or 2D map).
+- PNG export of the current view (2D or 3D).
 
 ## 4. Visual and physics assumptions
 
 The 3D view uses Three.js with a perspective camera. Physical µm are mapped to scene units only in `src/sceneTransform.js`: `(x, z·stretch, −y)·0.01`, a proper rotation with no mirroring. Z is exaggerated to improve readability, and this affects the display only.
 
-No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Demo mode does not shade pixels by any charge model; the illustrative Gaussian was removed in v0.4.0. Charge is shown only from pixelAV simulated events (data mode).
+No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Charge is shown only from pixelAV simulated events, which are the only data source; the illustrative Gaussian and geometric demo source were removed.
 
 ## 5. Future feature proposals (not implemented)
 
@@ -61,7 +61,7 @@ No actual particle/material interaction is simulated. The line is straight, with
 2. **More physical path intersection:** *done* as the separate `intersectVolume` / `traversedPixels`. Still open: deciding whether a side entry should count as a HIT (a scientific decision).
 3. **Charge cloud / drift:** optional idealized visualization of ionization and carrier drift, clearly labeled illustrative unless physics solver is integrated.
 4. **External data:** *done in v0.3.0* for pixelAV parquet datasets (converted to a sparse, Range-addressable format). See `docs/PIXELAV_DATA.md`.
-5. **ROI and ML:** overlay 16 × 16 ROI, center-finding, projected impact at z=−50, and reconstruction comparison.
+5. **ROI and ML:** 16 × 16 ROI analysis, center-finding, projected impact at z=−50, and reconstruction comparison.
 6. **Publication output:** repeatable camera poses, adjustable colors, annotated image export and timeline video frames.
 
 ## 6. Acceptance and tests

@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import {
   SENSOR, point, traceParticle, intersectVolume, traversedPixels,
-  roiWindow, roiBounds, roiContains, progressAtZ, pointAtProgress,
+  progressAtZ, pointAtProgress, trackSegments,
 } from './geometry.js';
 import {
   SCENE_SCALE, toScene, fromScene, cameraDirection, anglesFromDirection,
@@ -16,7 +16,7 @@ import { chargeColor, pixelShading } from './chargeColors.js';
  * Every position is computed in physical µm by geometry.js and only then
  * mapped to the scene by sceneTransform.toScene(p, zStretch). The Z stretch
  * therefore changes the picture only. Nothing in this file decides hits,
- * pixels or ROI membership — it only draws what geometry.js returns.
+ * pixels — it only draws what geometry.js returns.
  */
 
 const COLORS = Object.freeze({
@@ -32,9 +32,8 @@ const COLORS = Object.freeze({
   top: 0x62f5f3,
   midMarker: 0x8fc3ff,
   exit: 0xffa070,
-  roi: 0xc792ff,
   side: 0xe879c9,
-  traversed: 0xffb46a,
+  traversed: 0xff3b30,
   outside: 0x8a99a8,
 });
 
@@ -132,7 +131,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   // ---- static sensor group (depends on zStretch / grid / midplane) ----
   let staticGroup = null;
   let staticKey = '';
-  // ---- track group (depends on particle, ROI and overlay toggles) ----
+  // ---- track group (depends on particle and overlay toggles) ----
   let trackGroup = null;
   let trackKey = '';
   let track = null; // cached geometry results + dynamic objects
@@ -304,8 +303,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   }
 
   /* ------------------------------------------------------------------ */
-  function fillPixelTexture(s, trace, traversed, roi) {
-    const traversedSet = new Set(traversed.map((p) => p.y * SENSOR.pixelsX + p.x));
+  function fillPixelTexture(s) {
     const shading = pixelShading(s);
     const dataCharge = shading === 'charge' ? s.charge : null;
     for (let iy = 0; iy < SENSOR.pixelsY; iy++) {
@@ -316,14 +314,9 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         let g = checker ? 104 : 92;
         let b = checker ? 136 : 124;
         let a = 120;
-        const blend = (cr, cg, cb, w, alpha) => {
-          r += (cr - r) * w; g += (cg - g) * w; b += (cb - b) * w; a = Math.max(a, alpha);
-        };
-        if (s.showRoi && roiContains(roi, { x: ix, y: iy })) blend(150, 110, 220, 0.28, 150);
-        if (s.showTraversed && traversedSet.has(i)) blend(255, 175, 95, 0.6, 210);
         // pixelAV SIMULATED charge replaces the pad colour (data mode only).
         const q = dataCharge ? dataCharge.dense[i] : 0;
-        if (q > 0) {
+        if (q !== 0) { // negative charge is drawn too
           [r, g, b] = chargeColor(q, dataCharge.scale);
           a = 245;
         }
@@ -395,8 +388,8 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
 
   function buildTrack() {
     const s = state();
-    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showRoi, s.roiMode,
-      s.showTraversed, s.showLabels, s.showGrid, s.showMid, s.mode, s.charge?.key, s.showChargeBars].join('|');
+    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showTrackOff, s.showTrackIn,
+      s.showTraversed, s.showLabels, s.showGrid, s.markTop, s.markMid, s.markExit, s.mode, s.charge?.key, s.showChargeBars].join('|');
     if (key === trackKey) return false;
     trackKey = key;
     if (trackGroup) { scene.remove(trackGroup); disposeTree(trackGroup, keep); }
@@ -405,22 +398,25 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     const trace = traceParticle(s);
     const volume = intersectVolume(s);
     const traversed = traversedPixels(s);
-    const roi = roiWindow(trace.topPixel, s.roiMode);
-    fillPixelTexture(s, trace, traversed, roi);
+    fillPixelTexture(s);
 
     const start = V(trace.start, st);
     const end = V(trace.bottom, st);
 
-    // Predicted full path (dashed) start → bottom plane.
-    const path = new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, end]), new THREE.LineDashedMaterial({
-      color: COLORS.beam, dashSize: 0.35, gapSize: 0.25, transparent: true, opacity: 0.55,
-    }));
-    path.computeLineDistances();
-    trackGroup.add(path);
-
-    const travelled = beam(COLORS.beam, 0.95);
-    const inSilicon = beam(COLORS.beamSilicon, 1);
-    trackGroup.add(travelled, inSilicon);
+    // Trajectory, split at the silicon: a dashed guide and a solid travelled beam per enabled part.
+    const beams = [];
+    for (const seg of trackSegments(trace, volume)) {
+      if (!(seg.kind === 'in' ? s.showTrackIn : s.showTrackOff)) continue;
+      const a = V(pointAtProgress(trace, seg.from), st);
+      const b = V(pointAtProgress(trace, seg.to), st);
+      const guide = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineDashedMaterial({
+        color: COLORS.beam, dashSize: 0.35, gapSize: 0.25, transparent: true, opacity: 0.55,
+      }));
+      guide.computeLineDistances();
+      const mesh = beam(seg.kind === 'in' ? COLORS.beamSilicon : COLORS.beam, seg.kind === 'in' ? 1 : 0.95);
+      trackGroup.add(guide, mesh);
+      beams.push({ ...seg, mesh, a, width: seg.kind === 'in' ? 0.55 : 0.35 });
+    }
 
     const particle = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffe1b0 }));
     particle.renderOrder = 14;
@@ -430,6 +426,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
 
     const startMarker = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: COLORS.particle, transparent: true, opacity: 0.6 }));
     startMarker.position.copy(start);
+    startMarker.visible = s.showTrackOff;
     trackGroup.add(startMarker);
 
     // Plane crossings: top (z=0), midplane (z=−50), exit/bottom (z=−100).
@@ -437,7 +434,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       { key: 'top', p: trace.top, pixel: trace.topPixel, color: COLORS.top, z: SENSOR.zTop, title: 'surface' },
       { key: 'mid', p: trace.mid, pixel: trace.midPixel, color: COLORS.midMarker, z: SENSOR.zMid, title: 'midplane' },
       { key: 'exit', p: trace.bottom, pixel: trace.exitPixel, color: COLORS.exit, z: SENSOR.zBottom, title: 'exit' },
-    ].filter((c) => c.key !== 'mid' || s.showMid);
+    ].filter((c) => ({ top: s.markTop, mid: s.markMid, exit: s.markExit })[c.key]);
 
     const reveal = [];
     for (const c of crossings) {
@@ -465,7 +462,8 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     }
 
     // Side entry / exit (volume test) — shown separately; never counted as a HIT.
-    if (volume) {
+    // They belong to the in-sensor trajectory and follow its toggle.
+    if (volume && s.showTrackIn) {
       for (const [which, p, face] of [['entry', volume.entry, volume.entryFace], ['exit', volume.exit, volume.exitFace]]) {
         if (face === 'top' || face === 'bottom') continue;
         const group = new THREE.Group();
@@ -483,19 +481,22 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       }
     }
 
-    // Pixel columns crossed by the in-silicon segment (geometric only).
-    if (s.showTraversed && traversed.length > 1) {
-      const geometry = new THREE.BoxGeometry(SENSOR.pitchX * SCENE_SCALE, SENSOR.thickness * SCENE_SCALE * st, SENSOR.pitchY * SCENE_SCALE);
-      const material = new THREE.MeshBasicMaterial({ color: COLORS.traversed, transparent: true, opacity: 0.12, depthWrite: false });
-      const columns = new THREE.InstancedMesh(geometry, material, traversed.length);
-      const m4 = new THREE.Matrix4();
-      traversed.forEach((p, i) => {
-        const c = point(-SENSOR.halfX + (p.x + 0.5) * SENSOR.pitchX, -SENSOR.halfY + (p.y + 0.5) * SENSOR.pitchY, SENSOR.zMid);
-        m4.makeTranslation(V(c, st));
-        columns.setMatrixAt(i, m4);
-      });
-      columns.renderOrder = 4;
-      trackGroup.add(columns);
+    // Pixels crossed by the in-silicon segment (geometric only): thin red borders on the surface.
+    if (s.showTraversed && traversed.length) {
+      const pts = [];
+      for (const p of traversed) {
+        const x0 = -SENSOR.halfX + p.x * SENSOR.pitchX;
+        const y0 = -SENSOR.halfY + p.y * SENSOR.pitchY;
+        const corners = [[x0, y0], [x0 + SENSOR.pitchX, y0], [x0 + SENSOR.pitchX, y0 + SENSOR.pitchY], [x0, y0 + SENSOR.pitchY]]
+          .map(([x, y]) => V(point(x, y, SENSOR.zTop), st));
+        corners.forEach((c, k) => pts.push(c, corners[(k + 1) % 4]));
+      }
+      const borders = new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: COLORS.traversed, depthTest: false, transparent: true }),
+      );
+      borders.renderOrder = 9;
+      trackGroup.add(borders);
     }
 
     // pixelAV SIMULATED charge as bars above the pads: height ∝ charge (linear),
@@ -534,35 +535,14 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       }
     }
 
-    // 16 × 16 ROI as a volume outline + label.
-    if (s.showRoi && roi) {
-      const b = roiBounds(roi);
-      const w = (b.xMax - b.xMin) * SCENE_SCALE;
-      const d = (b.yMax - b.yMin) * SCENE_SCALE;
-      const t = SENSOR.thickness * SCENE_SCALE * st;
-      const center = V(point((b.xMin + b.xMax) / 2, (b.yMin + b.yMax) / 2, SENSOR.zMid), st);
-      const roiBox = new THREE.BoxGeometry(w, t * 1.002, d);
-      const outline = new THREE.LineSegments(new THREE.EdgesGeometry(roiBox), new THREE.LineBasicMaterial({ color: COLORS.roi, transparent: true, opacity: 0.95, depthTest: false }));
-      outline.position.copy(center);
-      outline.renderOrder = 9;
-      const fill = new THREE.Mesh(roiBox, new THREE.MeshBasicMaterial({ color: COLORS.roi, transparent: true, opacity: 0.08, depthWrite: false }));
-      fill.position.copy(center);
-      trackGroup.add(fill, outline);
-      if (s.showLabels) {
-        const label = makeLabel(`ROI 16×16 · x ${roi.x0}–${roi.x1 - 1}, y ${roi.y0}–${roi.y1 - 1}`, 'roi', [0, 1.1]);
-        label.position.copy(V(point(b.xMin, b.yMax, 0), st));
-        trackGroup.add(label);
-      }
-    }
-
-    if (s.showLabels) {
+    if (s.showLabels && s.showTrackOff) {
       const label = makeLabel(`start (${fmt(trace.start.x)}, ${fmt(trace.start.y)}, ${fmt(trace.start.z)}) µm`, 'start', [-0.1, 1.3]);
       label.position.copy(start);
       trackGroup.add(label);
     }
 
     scene.add(trackGroup);
-    track = { trace, volume, start, end, travelled, inSilicon, particle, glow, startMarker, reveal, st };
+    track = { trace, start, end, beams, particle, glow, startMarker, reveal, st };
     return true;
   }
 
@@ -570,18 +550,14 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   function updateDynamic() {
     if (!track) return;
     const s = state();
-    const { trace, volume, start, travelled, inSilicon, particle, glow, startMarker, reveal, st } = track;
+    const { trace, beams, particle, glow, startMarker, reveal, st } = track;
     const fraction = s.progress;
     const current = V(pointAtProgress(trace, fraction), st);
     const scale = camera.position.distanceTo(controls.target) * 0.0065;
 
-    placeBeam(travelled, start, current, scale * 0.35);
-    if (volume && fraction > progressAtZ(trace, volume.entry.z)) {
-      const a = V(volume.entry, st);
-      const until = Math.min(fraction, progressAtZ(trace, volume.exit.z));
-      placeBeam(inSilicon, a, V(pointAtProgress(trace, until), st), scale * 0.55);
-    } else {
-      inSilicon.visible = false;
+    for (const b of beams) {
+      if (fraction > b.from) placeBeam(b.mesh, b.a, V(pointAtProgress(trace, Math.min(fraction, b.to)), st), scale * b.width);
+      else b.mesh.visible = false;
     }
     particle.position.copy(current);
     particle.scale.setScalar(scale * 1.1);

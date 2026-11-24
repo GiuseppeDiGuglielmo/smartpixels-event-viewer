@@ -5,6 +5,7 @@ import {
   progressAtZ, pointAtProgress, intersectVolume, traversedPixels, pixelAt,
 } from '../src/geometry.js';
 import { PRESETS } from '../src/presets.js';
+import { trackSegments } from '../src/geometry.js';
 import {
   SCENE_SCALE, toScene, fromScene, cameraDirection, anglesFromDirection,
 } from '../src/sceneTransform.js';
@@ -211,4 +212,16 @@ test('vertical track on an interior pixel boundary belongs to the higher column 
   const list = traversedPixels({ x0: -1150, y0: 0, z0: 100, thetaX: 0, thetaY: 0 });
   assert.equal(list.length, 1);
   assert.equal(list[0].x, 1);
+});
+
+test('trajectory segments split at the silicon and cover the whole path', () => {
+  const kinds = (p) => trackSegments(traceParticle(p), intersectVolume(p)).map((g) => g.kind);
+  assert.deepEqual(kinds(PRESETS.angled), ['off', 'in']);
+  assert.deepEqual(kinds(PRESETS.miss), ['off']);
+  const sideExit = { x0: 1000, y0: 0, z0: 100, thetaX: 60, thetaY: 0 }; // surface x ≈ 1173, bottom x ≈ 1346
+  assert.deepEqual(kinds(sideExit), ['off', 'in', 'off']);
+  const segs = trackSegments(traceParticle(sideExit), intersectVolume(sideExit));
+  assert.equal(segs[0].from, 0);
+  assert.equal(segs.at(-1).to, 1);
+  for (let i = 1; i < segs.length; i++) assert.equal(segs[i].from, segs[i - 1].to);
 });

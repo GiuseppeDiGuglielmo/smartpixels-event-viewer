@@ -1,26 +1,28 @@
 /**
- * 2D top view of the full 48 × 192 pixel array (the "2D pixel map").
+ * 2D top view of the full 48 × 192 pixel array (the "2D" view).
  *
  * Physical aspect: the map is drawn in µm with equal X and Y scale, so each
- * pixel appears 50 × 12.5 µm. +x to the right, +y UP (same as the 3D top view
- * and the ROI panel); pixel indices are zero-based and never transposed.
+ * pixel appears 50 × 12.5 µm. +x to the right, +y UP (same as the 3D top view);
+ * pixel indices are zero-based and never transposed.
  *
- * Pixel colours: pixelAV SIMULATED charge in data mode (pixelShading), nothing
- * in demo mode. Everything else is geometry from geometry.js: the projected
+ * Pixel colours: pixelAV SIMULATED charge (pixelShading), positive and negative.
+ * Everything else is geometry from geometry.js: the projected
  * track, the pixels it crosses, and the crossing points at the top surface
  * (z = 0), the midplane (z = −50) and the exit plane (z = −100).
  *
  * The layout helpers (mapWindow, mapTransform, crossingMarkers, pickPixel) are
  * pure and tested in Node; drawPixelMap needs only a CanvasRenderingContext2D.
  */
-import { SENSOR, pixelAt, progressAtZ, pointAtProgress } from './geometry.js';
+import { SENSOR, pixelAt, progressAtZ, pointAtProgress, trackSegments } from './geometry.js';
 import { chargeColor, pixelShading } from './chargeColors.js';
 
 export const FULL_WINDOW = Object.freeze({ x0: -SENSOR.halfX, x1: SENSOR.halfX, y0: -SENSOR.halfY, y1: SENSOR.halfY });
 export const MAP_FITS = Object.freeze(['full', 'track']);
 export const AXIS_UNITS = Object.freeze(['um', 'px']);
-/** Heavier grid line every MAJOR pixels: 48 / 16 × 192 / 16 = the 3 × 12 aligned-ROI tiles. */
-export const MAJOR = 16;
+/** Pixel boundaries on the sensor's central axes (x = 0 and y = 0 µm). */
+export const CENTER_X = SENSOR.pixelsX / 2;
+export const CENTER_Y = SENSOR.pixelsY / 2;
+export const CROSSED_COLOR = '#ff3b30';
 
 /** Crossing markers, in drawing order. `z` is the physical plane in µm. Colours match the 3D markers. */
 export const CROSSINGS = Object.freeze([
@@ -109,6 +111,45 @@ export function mapTransform(win, width, height, pad = { left: 56, right: 16, to
   };
 }
 
+/**
+ * Window after zooming by `factor` about canvas point (px, py): the µm under
+ * that point stays put unless this would show area beyond the sensor. Zoom-in
+ * stops when one 50 µm pixel fills the plot. Returns null once zoomed out to
+ * the full sensor.
+ */
+export function zoomWindow(t, px, py, factor) {
+  const innerW = Math.max(1, t.width - t.pad.left - t.pad.right);
+  const innerH = Math.max(1, t.height - t.pad.top - t.pad.bottom);
+  const fullScale = mapTransform(FULL_WINDOW, t.width, t.height, t.pad).scale;
+  const maxScale = Math.min(innerW, innerH) / SENSOR.pitchX;
+  const scale = Math.min(maxScale, t.scale * factor);
+  if (scale <= fullScale * (1 + 1e-9)) return null;
+  const at = t.toUm(px, py);
+  return windowAt(t, at.x - (px - (t.pad.left + innerW / 2)) / scale, at.y + (py - (t.pad.top + innerH / 2)) / scale, scale);
+}
+
+/** Window of the given scale centred on (mx, my), moved back if it would show area beyond the sensor. */
+function windowAt(t, mx, my, scale) {
+  const spanX = Math.max(1, t.width - t.pad.left - t.pad.right) / scale;
+  const spanY = Math.max(1, t.height - t.pad.top - t.pad.bottom) / scale;
+  const centre = (value, span, half) => (span >= 2 * half ? 0 : Math.max(-half + span / 2, Math.min(half - span / 2, value)));
+  const x = centre(mx, spanX, SENSOR.halfX);
+  const y = centre(my, spanY, SENSOR.halfY);
+  return { x0: x - spanX / 2, x1: x + spanX / 2, y0: y - spanY / 2, y1: y + spanY / 2 };
+}
+
+/** True when the view is closer than the full sensor, so there is somewhere to drag to. */
+export function canPan(t) {
+  return t.scale > mapTransform(FULL_WINDOW, t.width, t.height, t.pad).scale * (1 + 1e-9);
+}
+
+/** Window after dragging the map by (dx, dy) canvas pixels from transform t; the content follows the pointer. */
+export function panWindow(t, dx, dy) {
+  const mx = (t.visible.x0 + t.visible.x1) / 2 - dx / t.scale;
+  const my = (t.visible.y0 + t.visible.y1) / 2 + dy / t.scale;
+  return windowAt(t, mx, my, t.scale);
+}
+
 /** Pixel under a canvas position (or null), via geometry.pixelAt. */
 export function pickPixel(transform, px, py) {
   const p = transform.toUm(px, py);
@@ -128,35 +169,38 @@ export function tickStep(scale, minPx = 70) {
   return 10 * pow;
 }
 
-/** Smallest power-of-two index step (1, 2, 4, … 64) whose ticks are at least `minPx` apart. */
+/** Smallest power-of-two pixel step (1, 2, 4, … 32) whose ticks are at least `minPx` apart. */
 export function indexStep(pitch, scale, minPx = 40) {
   let step = 1;
-  while (step < 64 && step * pitch * scale < minPx) step *= 2;
+  while (step < 32 && step * pitch * scale < minPx) step *= 2;
   return step;
 }
 
 /**
  * Axis ticks for the visible window, limited to the sensor footprint.
  *  units 'um': physical µm (origin at the sensor centre), nice steps.
- *  units 'px': zero-based pixel index at pixel centres (x 0..47, y 0..191).
+ *  units 'px': pixels counted from the sensor centre (x −24..24, y −96..96),
+ *  so 0 is the central axis and each tick is a pixel boundary. These are
+ *  distances, not pixel addresses, which stay zero-based (x 0..47, y 0..191).
  * Returns { x: [{ at, text }], y: [{ at, text }], title: { x, y } } with `at` in µm.
  */
 export function axisTicks(visible, scale, units = 'um') {
   const clip = (lo, hi, half) => [Math.max(lo, -half), Math.min(hi, half)];
   if (units === 'px') {
-    const axis = (lo, hi, half, pitch, n) => {
+    const axis = (lo, hi, half, pitch) => {
       const step = indexStep(pitch, scale);
+      const last = Math.floor(half / pitch / step);
       const out = [];
-      for (let i = 0; i < n; i += step) {
-        const at = -half + (i + 0.5) * pitch;
-        if (at >= lo && at <= hi) out.push({ at, text: String(i) });
+      for (let k = -last; k <= last; k++) {
+        const at = k * step * pitch;
+        if (at >= lo && at <= hi) out.push({ at, text: String(k * step + 0) });
       }
       return out;
     };
     return {
-      x: axis(visible.x0, visible.x1, SENSOR.halfX, SENSOR.pitchX, SENSOR.pixelsX),
-      y: axis(visible.y0, visible.y1, SENSOR.halfY, SENSOR.pitchY, SENSOR.pixelsY),
-      title: { x: 'x pixel index →', y: 'y pixel index →' },
+      x: axis(visible.x0, visible.x1, SENSOR.halfX, SENSOR.pitchX),
+      y: axis(visible.y0, visible.y1, SENSOR.halfY, SENSOR.pitchY),
+      title: { x: 'x (pixels from centre) →', y: 'y (pixels from centre) →' },
     };
   }
   const step = tickStep(scale);
@@ -178,33 +222,31 @@ export function axisTicks(visible, scale, units = 'um') {
 
 /**
  * Pixel boundaries to draw along one axis between index lo and hi: every
- * boundary when they are at least `minPx` apart, otherwise every 2nd, 4th, …; indices
- * that are multiples of MAJOR are flagged as major.
+ * boundary when they are at least `minPx` apart, otherwise every 2nd, 4th, …
+ * counted from `center`, whose line is always kept and flagged.
  */
-export function gridLines(lo, hi, pitch, scale, minPx = 2.5) {
-  // Powers of two (≤ MAJOR) so thinned lines divide the 16-pixel tiles evenly.
+export function gridLines(lo, hi, pitch, scale, center, minPx = 2.5) {
   let every = 1;
-  while (every < MAJOR && every * pitch * scale < minPx) every *= 2;
+  while (every < 16 && every * pitch * scale < minPx) every *= 2;
   const out = [];
   for (let i = lo; i <= hi; i++) {
-    const major = i % MAJOR === 0;
-    if (major || i % every === 0) out.push({ i, major });
+    if ((i - center) % every === 0) out.push({ i, center: i === center });
   }
   return out;
 }
 
 /**
  * Draw the map. `options`:
- *  trace, volume, traversed, roi, charge, mode, progress (0..1),
- *  show: { grid, traversed, roi, top, mid, exit, centroid, labels },
- *  fit ('full' | 'track'), units ('um' | 'px'), hover ({ pixel, x, y } | null), dpr.
+ *  trace, volume, traversed, charge, mode, progress (0..1),
+ *  show: { grid, traversed, trackOff, trackIn, top, mid, exit },
+ *  fit ('full' | 'track'), customWindow (wheel zoom; overrides fit), units ('um' | 'px'), hover ({ pixel, x, y } | null), dpr.
  * Returns the transform used (for hover picking).
  */
 export function drawPixelMap(ctx, width, height, options) {
-  const { trace, volume = null, traversed = [], roi = null, charge = null, frameCharge = null, mode = 'demo', progress = 1, show = {}, fit = 'full', units = 'um', hover = null, dpr = 1 } = options;
+  const { trace, volume = null, traversed = [], charge = null, frameCharge = null, mode = 'data', progress = 1, show = {}, fit = 'full', customWindow = null, units = 'um', hover = null, dpr = 1 } = options;
   const shading = pixelShading({ mode, charge });
   // Frame on `frameCharge` (e.g. the event's last slice) so the view stays put while scrubbing slices.
-  const win = mapWindow(fit, { trace, volume, charge: shading === 'charge' ? (frameCharge ?? charge) : null });
+  const win = customWindow ?? mapWindow(fit, { trace, volume, charge: shading === 'charge' ? (frameCharge ?? charge) : null });
   const t = mapTransform(win, width, height);
   const { scale, toCanvas, visible } = t;
   const P = (x, y) => toCanvas(x, y);
@@ -237,103 +279,89 @@ export function drawPixelMap(ctx, width, height, options) {
   if (shading === 'charge') {
     const { indices, charges } = charge.sparse;
     for (let i = 0; i < indices.length; i++) {
-      if (!(charges[i] > 0)) continue;
+      if (!charges[i]) continue; // negative charge is drawn too
       const [r, g, b] = chargeColor(charges[i], charge.scale);
       fillCell(indices[i] % SENSOR.pixelsX, Math.floor(indices[i] / SENSOR.pixelsX), `rgb(${r},${g},${b})`);
     }
   }
 
-  // Pixels crossed by the track (geometric), drawn as an amber wash.
-  if (show.traversed) {
-    for (const p of traversed) {
-      if (p.x < ix0 || p.x >= ix1 || p.y < iy0 || p.y >= iy1) continue;
-      fillCell(p.x, p.y, shading === 'charge' ? 'rgba(255,180,106,0.22)' : 'rgba(255,180,106,0.5)');
-    }
-  }
 
-  // Grid: pixel boundaries (thinned when denser than 2.5 canvas px) plus a heavier line every MAJOR pixels.
+  // Grid: pixel boundaries (thinned when denser than 2.5 canvas px), with the central x = 0 and y = 0 axes highlighted.
   if (show.grid) {
-    const xs = gridLines(ix0, ix1, SENSOR.pitchX, scale);
-    const ys = gridLines(iy0, iy1, SENSOR.pitchY, scale);
+    const xs = gridLines(ix0, ix1, SENSOR.pitchX, scale, CENTER_X);
+    const ys = gridLines(iy0, iy1, SENSOR.pitchY, scale, CENTER_Y);
     const top = Math.max(fy0, 0); const bot = Math.min(fy1, height);
     const left = Math.max(fx0, 0); const right = Math.min(fx1, width);
-    for (const major of [false, true]) {
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = major ? 'rgba(150,190,225,0.45)' : 'rgba(120,160,200,0.16)';
+    for (const center of [false, true]) {
+      ctx.lineWidth = center ? 1.5 : 1;
+      ctx.strokeStyle = center ? 'rgba(214,234,250,0.85)' : 'rgba(120,160,200,0.16)';
       ctx.beginPath();
       for (const g of xs) {
-        if (g.major !== major) continue;
+        if (g.center !== center) continue;
         const [x] = P(-SENSOR.halfX + g.i * SENSOR.pitchX, 0);
         ctx.moveTo(Math.round(x) + 0.5, top); ctx.lineTo(Math.round(x) + 0.5, bot);
       }
       for (const g of ys) {
-        if (g.major !== major) continue;
+        if (g.center !== center) continue;
         const [, y] = P(0, -SENSOR.halfY + g.i * SENSOR.pitchY);
         ctx.moveTo(left, Math.round(y) + 0.5); ctx.lineTo(right, Math.round(y) + 0.5);
       }
       ctx.stroke();
     }
   }
+  // Pixels crossed by the track (geometric): a thin red border, so the charge colour stays readable.
+  if (show.traversed) {
+    ctx.strokeStyle = CROSSED_COLOR;
+    ctx.lineWidth = 1;
+    for (const p of traversed) {
+      if (p.x < ix0 || p.x >= ix1 || p.y < iy0 || p.y >= iy1) continue;
+      const [x, y, w, h] = cell(p.x, p.y);
+      ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, w - 1), Math.max(1, h - 1));
+    }
+  }
   ctx.strokeStyle = '#5f84a6';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(fx0, fy0, fx1 - fx0, fy1 - fy0);
 
-  // 16 × 16 ROI.
-  if (show.roi && roi) {
-    const [rx, ry] = P(-SENSOR.halfX + roi.x0 * SENSOR.pitchX, -SENSOR.halfY + roi.y1 * SENSOR.pitchY);
-    const w = (roi.x1 - roi.x0) * SENSOR.pitchX * scale;
-    const h = (roi.y1 - roi.y0) * SENSOR.pitchY * scale;
-    ctx.fillStyle = 'rgba(199,146,255,0.08)';
-    ctx.fillRect(rx, ry, w, h);
-    ctx.strokeStyle = '#c792ff';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(rx, ry, w, h);
-    ctx.setLineDash([]);
-  }
-
-  // Projected track: dashed above the surface, solid inside the silicon (top → bottom plane).
-  const [sx, sy] = P(trace.start.x, trace.start.y);
-  const [tx, ty] = P(trace.top.x, trace.top.y);
-  const [bx, by] = P(trace.bottom.x, trace.bottom.y);
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(255,155,110,0.55)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 5]);
-  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); ctx.stroke();
-  ctx.setLineDash([]);
+  // Trajectory, split at the silicon: dashed off the sensor; inside it a faint
+  // guide plus a bright part for the distance travelled so far.
   const reach = Math.max(0, Math.min(1, progress));
-  // Bright: the part of the path inside the silicon travelled so far (volume entry → min(now, exit)).
-  if (volume) {
-    const enter = progressAtZ(trace, volume.entry.z);
-    const leave = Math.min(reach, progressAtZ(trace, volume.exit.z));
-    if (leave > enter) {
-      const [ex, ey] = P(volume.entry.x, volume.entry.y);
-      const now = pointAtProgress(trace, leave);
-      const [nx, ny] = P(now.x, now.y);
-      ctx.strokeStyle = 'rgba(255,240,160,0.9)';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(nx, ny); ctx.stroke();
+  ctx.lineCap = 'round';
+  const stroke = (from, to) => {
+    const a = pointAtProgress(trace, from);
+    const b = pointAtProgress(trace, to);
+    ctx.beginPath(); ctx.moveTo(...P(a.x, a.y)); ctx.lineTo(...P(b.x, b.y)); ctx.stroke();
+  };
+  for (const seg of trackSegments(trace, volume)) {
+    if (seg.kind === 'off') {
+      if (show.trackOff === false) continue;
+      ctx.strokeStyle = 'rgba(255,155,110,0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 5]);
+      stroke(seg.from, seg.to);
+      ctx.setLineDash([]);
+    } else {
+      if (show.trackIn === false) continue;
+      ctx.strokeStyle = 'rgba(255,240,160,0.45)';
+      ctx.lineWidth = 1;
+      stroke(seg.from, seg.to);
+      if (reach > seg.from) {
+        ctx.strokeStyle = 'rgba(255,240,160,0.9)';
+        ctx.lineWidth = 3;
+        stroke(seg.from, Math.min(reach, seg.to));
+      }
     }
   }
-  // Faint guide for the segment inside the silicon: the volume chord when it
-  // exists (clipped at side faces), otherwise the top → exit-plane projection.
-  const [gx0, gy0] = volume ? P(volume.entry.x, volume.entry.y) : [tx, ty];
-  const [gx1, gy1] = volume ? P(volume.exit.x, volume.exit.y) : [bx, by];
-  ctx.strokeStyle = volume ? 'rgba(255,240,160,0.45)' : 'rgba(255,240,160,0.2)';
-  ctx.lineWidth = 1;
-  if (!volume) ctx.setLineDash([3, 4]);
-  ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy1); ctx.stroke();
-  ctx.setLineDash([]);
 
-  // Side entry / exit through the lateral faces (reported separately from the HIT).
-  if (volume) {
+  // Side entry / exit through the lateral faces (reported separately from the HIT);
+  // they belong to the in-sensor trajectory and follow its toggle.
+  if (volume && show.trackIn !== false) {
     for (const [p, face] of [[volume.entry, volume.entryFace], [volume.exit, volume.exitFace]]) {
       if (face === 'top' || face === 'bottom') continue;
       const [x, y] = P(p.x, p.y);
       ctx.fillStyle = '#e879c9';
       ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-      if (show.labels) labels.push({ text: `side ${face}`, ax: x, ay: y, x: x + 9, y: y + 16, color: '#f5b3e3' });
+      labels.push({ text: `side ${face}`, ax: x, ay: y, x: x + 9, y: y + 16, color: '#f5b3e3' });
     }
   }
 
@@ -348,22 +376,8 @@ export function drawPixelMap(ctx, width, height, options) {
       ctx.strokeRect(cx - 1, cy - 1, w + 2, h + 2);
     }
     crosshair(ctx, x, y, m.color, m.inside);
-    if (show.labels) {
-      const text = m.inside ? `${m.title} · px (${m.pixel.x}, ${m.pixel.y})` : `${m.title} · outside sensor`;
-      labels.push({ text, ax: x, ay: y, x: x + 12, y: y - 9, color: m.color });
-    }
-  }
-
-  // Charge-weighted centroid of the simulated charge (data mode).
-  if (show.centroid && shading === 'charge' && charge.stats?.centroid) {
-    const { x: cx0, y: cy0 } = charge.stats.centroid;
-    const [x, y] = P(cx0, cy0);
-    ctx.fillStyle = '#fde68a';
-    ctx.strokeStyle = '#0a1626';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 6); ctx.lineTo(x - 6, y); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    if (show.labels) labels.push({ text: 'charge centroid', ax: x, ay: y, x: x - 12, y: y + 20, color: '#fde68a', align: 'right' });
+    const text = m.inside ? `${m.title} · px (${m.pixel.x}, ${m.pixel.y})` : `${m.title} · outside sensor`;
+    labels.push({ text, ax: x, ay: y, x: x + 12, y: y - 9, color: m.color });
   }
 
   // Particle position during the animation.

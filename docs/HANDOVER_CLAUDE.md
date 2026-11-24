@@ -6,7 +6,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 - how the first two milestones were run with oh-my-claudecode (OMC),
 - how to check the agent's work before trusting it.
 
-## 1. Where the project stands (v0.5.0)
+## 1. Where the project stands (v0.6.0)
 
 | Milestone | Status | Where to read about it |
 |---|---|---|
@@ -14,6 +14,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 | 2. pixelAV simulated events (Parquet → sparse files, one event per HTTP Range request) | Done, reviewed | `docs/PIXELAV_DATA.md` |
 | 3. Illustrative Gaussian removed; 2D pixel map with surface/midplane/exit markers (v0.4.0) | Done | `README.md` ("2D pixel map") |
 | 4. 2D map is the default view (full 48 × 192 array, µm / pixel axes); controls regrouped by view (v0.5.0) | Done | `README.md` ("Layout") |
+| 5. View renamed 2D; central x = 0 / y = 0 axes highlighted; pixel axis counted from the centre (v0.6.0) | Done | `README.md` ("2D view") |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
 1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
@@ -32,7 +33,7 @@ Candidate next tasks are listed under "Suggested future improvements" in `README
 | Claude Code | The agent. Run `claude` in this folder. |
 | oh-my-claudecode | Optional. Adds a multi-agent workflow on top of Claude Code (§4). |
 
-The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the project folder handed over; it is git-ignored. Regenerate it from the source Parquet files, about 8 min with `--jobs 4` (see `docs/PIXELAV_DATA.md`). Without it, the viewer's demo mode works and data mode says no data is available. `npm test` still passes, because it uses the small real-data fixture in `tests/fixtures/pixelav/`.
+The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the project folder handed over; it is git-ignored. Regenerate it from the source Parquet files, about 8 min with `--jobs 4` (see `docs/PIXELAV_DATA.md`). Without it, the viewer says no data is available and shows no track. `npm test` still passes, because it uses the small real-data fixture in `tests/fixtures/pixelav/`.
 
 ## 3. What Claude reads automatically
 
@@ -104,7 +105,7 @@ When autopilot cannot get a human answer, it records each guess as an assumption
 
   > Read CLAUDE.md, README.md, docs/PIXELAV_DATA.md and docs/HANDOVER_CLAUDE.md. Run `npm test`.
   > Then add event filtering by cotα/cotβ/pT using the truth columns already in each file's index (no new downloads).
-  > Keep simulated data separate from the geometric demo, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
+  > Keep pixelAV as the only charge source, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
 
 ## 6. How to check the agent's work
 
@@ -128,7 +129,7 @@ Then compare against the guardrails in `CLAUDE.md`:
 - the slope formulas;
 - zero-based pixel indices, no transpose;
 - Z stretch is display-only;
-- only pixelAV simulated charge colours pixels (demo mode is geometry only).
+- only pixelAV simulated charge colours pixels.
 
 A change that only alters screenshots does not prove the geometry is correct.
 

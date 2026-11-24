@@ -1,16 +1,17 @@
 /**
- * "pixelAV simulated events" mode: event browser, time-slice control and the
+ * pixelAV simulated events: event browser, time-slice control and the
  * simulated-event readout. Loads events lazily through eventSource.js (one
  * HTTP Range request per event, small LRU caches) — never whole files.
  *
- * Charge is shown only in data mode, and every label there says "pixelAV
- * simulated"; demo mode is geometry only.
+ * pixelAV is the only data source, and every charge label says "pixelAV
+ * simulated".
  */
 import { createEventSource } from './eventSource.js';
 import {
-  DATA_MODE_DEFAULT_Z0, sliceToDense, chargeStats, truthToParticle, truthMidplane,
+  DATA_MODE_DEFAULT_Z0, sliceToDense, applyThreshold, chargeStats, truthToParticle, lockedSlice, lockedProgress,
 } from './pixelav.js';
-import { RAMP_CSS } from './chargeColors.js';
+import { traceParticle, intersectVolume, progressAtZ } from './geometry.js';
+import { chargeLegend } from './chargeColors.js';
 
 const PARTICLE_KEYS = ['x0', 'y0', 'z0', 'thetaX', 'thetaY'];
 const SLICE_ANIMATION_MS = 2400;
@@ -18,15 +19,14 @@ const SLICE_ANIMATION_MS = 2400;
 export function createDataPanel({ state, el, update, stopParticle, dataUrl = './data/pixelav/' }) {
   let source = null;
   let sourcePromise = null;
-  let demoStash = null;
   let loadToken = 0;
   let sliceTimer = null;
   let requested = null; // { fileId, index } of the newest request (rapid ◀/▶ clicks accumulate)
-  let lastEvent = null; // restored when re-entering data mode
 
   const setStatus = (text, kind = '') => {
     el('dataStatus').textContent = text;
     el('dataStatus').className = `data-status ${kind}`;
+    el('noEvent').textContent = text; // shown over the viewport until an event is loaded
   };
 
   async function ensureSource() {
@@ -53,16 +53,21 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     if (!ev) { state.charge = null; return; }
     const t = Math.min(state.slice, ev.slices.length - 1);
     const finalStats = chargeStats(ev.slices[ev.slices.length - 1], state.threshold);
+    const shown = applyThreshold(ev.slices[t], state.threshold);
     // Colour/bar scale fixed per event (max over ALL slices) so time evolution is visible
     // and earlier slices never exceed it.
     ev.scale ??= Math.max(...ev.slices.map((sl) => chargeStats(sl).max));
+    ev.minCharge ??= Math.min(...ev.slices.map((sl) => chargeStats(sl).min));
     state.charge = {
-      key: `${ev.fileId}:${ev.eventIndex}:${t}`,
+      key: `${ev.fileId}:${ev.eventIndex}:${t}:${state.threshold}`,
       slice: t,
-      sparse: ev.slices[t],
-      dense: sliceToDense(ev.slices[t]),
+      // What the renderers draw: pixels with |q| above the display threshold.
+      sparse: shown,
+      dense: sliceToDense(shown),
+      rawDense: sliceToDense(ev.slices[t]), // every pixel, for the hover readout
       stats: chargeStats(ev.slices[t], state.threshold),
       scale: ev.scale,
+      minCharge: ev.minCharge,
       finalTotal: finalStats.total,
     };
   }
@@ -75,16 +80,26 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
   const fmt = (v, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
   const bool = (v) => (v ? 'yes' : 'no');
 
+  /** Signed colour scale of the event (fixed across its time slices). */
+  function renderLegend() {
+    const c = state.charge;
+    if (!c) return;
+    const { gradient, ticks } = chargeLegend(c.minCharge, c.scale);
+    el('chargeRampLegend').style.background = gradient;
+    el('chargeTicks').replaceChildren(...ticks.map(({ at, text }) => {
+      const tick = document.createElement('span');
+      tick.style.left = `${at}%`;
+      tick.textContent = text;
+      return tick;
+    }));
+  }
+
   function renderReadout() {
     const ev = state.event;
-    el('eventPanel').hidden = !(state.mode === 'data' && ev);
+    el('eventPanel').hidden = !ev;
     if (!ev) return;
     const t = ev.truth;
     const c = state.charge;
-    const mid = truthMidplane(t);
-    const residual = c?.stats.centroid && mid
-      ? `${fmt(c.stats.centroid.x - mid.x, 1)}, ${fmt(c.stats.centroid.y - mid.y, 1)} µm`
-      : '—';
     const rows = [
       ['Event', `${ev.file.split}/${ev.file.name} #${ev.eventIndex}`],
       ['cotα · cotβ', `${fmt(t.cotAlpha, 3)} · ${fmt(t.cotBeta, 3)}`],
@@ -92,10 +107,8 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       ['e–h pairs (truth)', fmt(t.number_eh_pairs, 0)],
       [`Σ q>0 @ slice ${c?.slice ?? '—'}`, c ? `${fmt(c.stats.total, 0)} e⁻ (${fmt((100 * c.stats.total) / (c.finalTotal || 1), 0)} %)` : '—'],
       ['Net charge (all entries)', c ? `${fmt(c.stats.net, 0)} e⁻` : '—'],
-      [`Pixels > ${state.threshold} e⁻`, c ? String(c.stats.nAbove) : '—'],
+      [`Pixels shown (|q| > ${state.threshold} e⁻)`, c ? String(c.stats.nAbove) : '—'],
       ['Max pixel', c ? `${fmt(c.stats.max, 0)} e⁻` : '—'],
-      ['Charge centroid px', c?.stats.centroidPixel ? `(${c.stats.centroidPixel.x}, ${c.stats.centroidPixel.y})` : '—'],
-      ['Centroid − truth mid', residual],
       ['offset1 · offset2', `${fmt(t.offset1, 0)} · ${fmt(t.offset2, 0)}`],
       ['at edge (orig · uncent.)', `${bool(t.original_atEdge)} · ${bool(t.uncentered_atEdge)}`],
       ['truth entry (pixelAV)', `${fmt(t['x-entry'], 1)}, ${fmt(t['y-entry'], 1)} µm`],
@@ -111,19 +124,16 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       return div;
     }));
     el('sliceInput').max = String(ev.slices.length - 1);
-    el('sliceLabel').textContent = `${c?.slice ?? 0} / ${ev.slices.length - 1}`;
+    el('sliceLabel').textContent = c ? `slice ${c.slice} / ${ev.slices.length - 1}` : 'before impact';
     el('sliceInput').value = String(c?.slice ?? 0);
+    renderLegend();
   }
 
   function writeUrl() {
     const params = new URLSearchParams(location.search);
-    if (state.mode === 'data' && state.event) {
-      params.set('mode', 'data');
-      params.set('file', `${state.event.file.split}/${state.event.file.name}`); // stable across manifest rebuilds
-      params.set('event', String(state.event.eventIndex));
-    } else {
-      params.delete('mode'); params.delete('file'); params.delete('event');
-    }
+    params.delete('mode'); // older links carried mode=data
+    params.set('file', `${state.event.file.split}/${state.event.file.name}`); // stable across manifest rebuilds
+    params.set('event', String(state.event.eventIndex));
     const query = params.toString();
     history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`);
   }
@@ -148,7 +158,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       requested = { fileId, index };
       setStatus(`Loading ${file.split}/${file.name} #${index}…`);
       const ev = await src.getEvent(fileId, index);
-      if (token !== loadToken || state.mode !== 'data') return; // a newer request won
+      if (token !== loadToken) return; // a newer request won
       stage = 'apply';
       // Compute everything before mutating state, so a bad record leaves the old event intact.
       const params = truthToParticle(ev.truth, state.dataZ0);
@@ -158,7 +168,6 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       state.slice = ev.slices.length - 1;
       computeCharge();
       applyParticle(params);
-      lastEvent = { fileId, index };
       el('dataFile').value = String(fileId);
       el('eventIndex').value = String(index);
       el('eventIndex').max = String(file.events - 1);
@@ -176,51 +185,74 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     }
   }
 
-  function enterData() {
-    if (state.mode === 'data') return;
-    demoStash = {
-      ...Object.fromEntries(PARTICLE_KEYS.map((k) => [k, state[k]])),
-      preset: el('preset').value,
-    };
-    state.mode = 'data';
-    el('dataControls').hidden = false;
-    lockParticleInputs(true);
-    const params = new URLSearchParams(location.search);
-    if (lastEvent) loadEvent(lastEvent.fileId, lastEvent.index);
-    else loadEvent(params.get('file'), Number(params.get('event') ?? 0));
-    update();
+  /** Track values come from the loaded event; only the display start height z0 is editable. */
+  function lockParticleInputs() {
+    for (const id of ['x0', 'y0', 'thetaX', 'thetaY']) {
+      el(id).disabled = true;
+      el(id).title = 'Set by the pixelAV truth of the loaded event';
+    }
+    el('z0').title = 'Start height above the surface (display only; the truth line is fixed)';
   }
 
-  function enterDemo() {
-    if (state.mode === 'demo') return;
-    loadToken++;
-    stopSlices();
-    state.mode = 'demo';
-    state.event = null;
-    state.charge = null;
-    el('dataControls').hidden = true;
-    lockParticleInputs(false);
-    if (demoStash) {
-      for (const k of PARTICLE_KEYS) { state[k] = demoStash[k]; el(k).value = String(state[k]); }
-      el('preset').value = demoStash.preset;
+  /** Animation range inside the silicon, over which locked slices are spread. */
+  function siliconRange() {
+    const volume = intersectVolume(state);
+    if (!volume) return { enter: 0, leave: 1 };
+    const trace = traceParticle(state);
+    return { enter: progressAtZ(trace, volume.entry.z), leave: progressAtZ(trace, volume.exit.z) };
+  }
+
+  /** With the lock on, the animation position decides the charge slice. Called before each redraw. */
+  function syncLockedSlice() {
+    if (!state.lockCharge || !state.event) return;
+    const { enter, leave } = siliconRange();
+    const t = lockedSlice(state.progress, enter, leave, state.event.slices.length);
+    if (t === null) {
+      if (state.charge) { state.charge = null; renderReadout(); }
+      return;
     }
-    state.progress = 1;
-    writeUrl();
+    if (t === state.charge?.slice) return;
+    state.slice = t;
+    computeCharge();
     renderReadout();
-    update();
   }
 
-  function lockParticleInputs(locked) {
-    for (const id of ['x0', 'y0', 'thetaX', 'thetaY', 'preset']) {
-      el(id).disabled = locked;
-      el(id).title = locked ? 'Set by the pixelAV truth of the loaded event' : '';
+  /** The chain between the Particle and Charge sliders: closed = locked, open = independent. */
+  function showLock() {
+    const button = el('lockCharge');
+    const locked = state.lockCharge;
+    button.setAttribute('aria-pressed', String(locked));
+    button.setAttribute('aria-label', locked ? 'Particle and charge locked. Unlock' : 'Particle and charge independent. Lock');
+    button.title = locked
+      ? 'Locked: particle and charge move together (a display mapping, not physical time). Click to unlock.'
+      : 'Unlocked: particle and charge move independently. Click to lock.';
+    el('playSlices').hidden = locked;
+  }
+
+  function setLock(locked) {
+    state.lockCharge = locked;
+    showLock();
+    stopSlices();
+    if (locked && state.event) {
+      // Keep the slice on screen: move the particle to it.
+      stopParticle();
+      const { enter, leave } = siliconRange();
+      state.progress = lockedProgress(state.slice, enter, leave, state.event.slices.length);
+    } else if (state.event && !state.charge) {
+      computeCharge();
     }
-    el('z0').title = locked ? 'Start height above the surface (display only; the truth line is fixed)' : '';
+    if (state.event) renderReadout();
+    update();
   }
 
   function setSlice(t) {
     if (!state.event) return;
     state.slice = Math.max(0, Math.min(state.event.slices.length - 1, t));
+    if (state.lockCharge) {
+      stopParticle();
+      const { enter, leave } = siliconRange();
+      state.progress = lockedProgress(state.slice, enter, leave, state.event.slices.length);
+    }
     computeCharge();
     renderReadout();
     update();
@@ -249,8 +281,6 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
   }
 
   function bind() {
-    el('chargeRampLegend').style.background = RAMP_CSS;
-    el('dataMode').addEventListener('change', (event) => (event.target.value === 'data' ? enterData() : enterDemo()));
     el('dataFile').addEventListener('change', () => loadEvent(Number(el('dataFile').value), 0));
     el('eventIndex').addEventListener('change', () => loadEvent(Number(el('dataFile').value), Number(el('eventIndex').value)));
     const step = (delta) => () => {
@@ -268,6 +298,8 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     });
     el('sliceInput').addEventListener('input', (event) => { stopSlices(); setSlice(Number(event.target.value)); });
     el('playSlices').addEventListener('click', playSlices);
+    showLock();
+    el('lockCharge').addEventListener('click', () => setLock(!state.lockCharge));
     el('barsToggle').checked = state.showChargeBars;
     el('barsToggle').addEventListener('change', (event) => { state.showChargeBars = event.target.checked; update(); });
     el('threshold').addEventListener('change', () => {
@@ -280,26 +312,26 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
     });
     // z0 stays editable in data mode: it only moves the start point along the truth line.
     el('z0').addEventListener('change', () => {
-      if (state.mode !== 'data' || !state.event) return;
+      if (!state.event) return;
       state.dataZ0 = state.z0;
       applyParticle(truthToParticle(state.event.truth, state.dataZ0));
       update();
     });
-    if (new URLSearchParams(location.search).get('mode') === 'data') {
-      el('dataMode').value = 'data';
-      enterData();
-    }
+    lockParticleInputs();
+    const params = new URLSearchParams(location.search);
+    loadEvent(params.get('file'), Number(params.get('event') ?? 0));
   }
 
-  return { bind, get source() { return source; } };
+  return { bind, syncLockedSlice, get source() { return source; } };
 }
 
 export const DATA_DEFAULTS = Object.freeze({
-  mode: 'demo',
+  mode: 'data',
   event: null,
   charge: null,
   slice: 19,
   threshold: 0,
   showChargeBars: true,
+  lockCharge: true, // Play and the Time slider also drive the charge time slice
   dataZ0: DATA_MODE_DEFAULT_Z0,
 });

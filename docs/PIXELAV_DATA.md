@@ -1,10 +1,10 @@
 # pixelAV simulated events in the viewer
 
-The viewer can show real **pixelAV simulated** events instead of the geometric demo:
+The viewer shows real **pixelAV simulated** events:
 - the truth straight track,
 - the collected charge per pixel (electrons), on the pads and as bars,
 - the charge's evolution over the 20 time slices,
-- a 2D top-view pixel map of the charge, with markers for the surface impact, midplane crossing, exit and charge centroid.
+- a 2D top-view pixel map of the charge, with markers for the surface impact, midplane crossing and exit.
 
 Source dataset used during development:
 
@@ -24,7 +24,7 @@ npm run convert:pixelav -- /path/to/dataset_2su_-9_9_48x192_50x12P5_parquets --j
 npm run dev                                  # serves ./data/pixelav at /data/pixelav/
 ```
 
-Open http://127.0.0.1:5173/ and choose **Data source → pixelAV simulated events**.
+Open http://127.0.0.1:5173/; the first event loads automatically.
 You can also link straight to an event: `http://127.0.0.1:5173/?mode=data&file=0&event=42`.
 
 The converter writes to `data/pixelav/` by default (git-ignored). It is incremental: unchanged files are skipped.
@@ -82,7 +82,7 @@ All of these are covered by `tests/pixelav.test.js`, which uses real events. For
 
 **Readout face.** The charge is drawn on the entry face, which is the viewer's top (z = 0) and pixelAV z = 100. The data support this. For steep tracks (|cotα| > 5, 800 events), the charge collected in the first time slice has its centroid at 0.31 of the way along the track from the entry face, while the final charge sits at 0.50. So the charge produced near the entry face reaches the pixels first, which puts the implants on that face. Please confirm with the pixelAV configuration.
 
-Data angles reach about ±84° (|cotα| up to about 9.8). The ±75° input limit applies only to the demo inputs.
+Data angles reach about ±84° (|cotα| up to about 9.8).
 
 ## What is simulated and what is not
 
@@ -92,7 +92,8 @@ Data angles reach about ±84° (|cotα| up to about 9.8). The ±75° input limit
   - the bar heights (linear in charge, with the event's maximum shown as 400 µm of display height; this height is not a z coordinate),
   - the Z exaggeration,
   - the start height above the sensor (`z0`, which only moves the start point along the truth line).
-- **Demo mode** has no pixel response at all (the illustrative Gaussian was removed in v0.4.0).
+- There is no demo source or made-up pixel response; pixelAV is the only data source.
+- **Negative charge is real data and is drawn.** In a 2,000-event sample (4 files), every event has negative pixels in slices 0–10, none from slice 11 on, down to −2,333 e⁻ and typically about 8 % of the event's maximum. The 3D charge bars still show positive charge only.
 - **Not interpreted:** columns such as `pt`, `y-local`, `offset1/2` and `*_atEdge` are shown as stored. From the data, `offset1` tracks y-midplane and `offset2` tracks x-midplane (r ≈ 0.98).
 
 ## Tests

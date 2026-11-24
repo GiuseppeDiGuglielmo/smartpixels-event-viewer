@@ -1,34 +1,31 @@
 import {
-  SENSOR, DEFAULT_STATE, clamp, traceParticle, intersectVolume, traversedPixels, roiWindow,
+  SENSOR, DEFAULT_STATE, clamp, traceParticle, intersectVolume, traversedPixels,
 } from './geometry.js';
-import { PRESETS } from './presets.js';
 import { createRenderer } from './renderer.js';
-import { drawRoiPanel } from './roiPanel.js';
-import { drawPixelMap, pickPixel, MAP_FITS, AXIS_UNITS } from './pixelMap2d.js';
+import { drawPixelMap, pickPixel, zoomWindow, panWindow, canPan, MAP_FITS, AXIS_UNITS } from './pixelMap2d.js';
 import { createDataPanel, DATA_DEFAULTS } from './dataPanel.js';
 
 const el = (id) => document.getElementById(id);
 const frame = el('frame');
 const legacyCanvas = el('scene');
-const roiCanvas = el('roi');
 const mapCanvas = el('map2d');
 
 // Display-only options live here, not in geometry.js.
 const VIEW_DEFAULTS = Object.freeze({
-  showRoi: false,
-  roiMode: 'centered',
-  showTraversed: true,
+  // Show panel: only the grid (DEFAULT_STATE.showGrid) starts on.
+  showTraversed: false,
+  showTrackOff: false,
+  showTrackIn: false,
   showLabels: true,
   loop: false,
-  // 2D pixel map
+  // 2D view
   view: '2d',
   mapFit: 'full',
+  mapZoom: null, // µm window set by the mouse wheel; overrides mapFit until a framing button is used
   axisUnits: 'um',
-  markTop: true,
-  markMid: true,
-  markExit: true,
-  markCentroid: true,
-  mapLabels: true,
+  markTop: false,
+  markMid: false,
+  markExit: false,
 });
 const state = { ...DEFAULT_STATE, ...VIEW_DEFAULTS, ...DATA_DEFAULTS, animating: false };
 let ELEVATION_MIN = -89; // the legacy 2D fallback narrows this to 5..85
@@ -38,6 +35,7 @@ let ZOOM_MAX = 80;
 const DURATION_MS = 3200;
 
 let renderer = null;
+let dataPanel = null;
 
 function syncCameraInputs() {
   el('azimuth').value = String(Math.round(state.azimuth));
@@ -84,7 +82,6 @@ function updateReadout() {
   const ray = traceParticle(state);
   const volume = intersectVolume(state);
   const traversed = traversedPixels(state);
-  const roi = roiWindow(ray.topPixel, state.roiMode);
   el('hitStatus').textContent = ray.hit ? 'HIT' : 'MISS';
   el('hitStatus').className = ray.hit ? 'good' : 'warn';
   el('hitPosition').textContent = crossing(ray.top, ray.topPixel);
@@ -97,28 +94,15 @@ function updateReadout() {
   el('rendererBadge').textContent = renderer?.kind === 'webgl' ? 'WebGL · Three.js' : '2D canvas fallback';
   el('timeline').value = String(Math.round(state.progress * 1000));
   el('progressLabel').textContent = `${Math.round(state.progress * 100)}%`;
-  const dataMode = state.mode === 'data' && state.charge;
-  const shading = dataMode
-    ? `Colour: pixelAV simulated charge at time slice ${state.charge.slice} (log scale, e⁻)`
-    : state.mode === 'data'
-      ? 'No pixelAV event loaded yet (no charge shown)'
-      : 'Demo mode: no pixel shading (geometry only)';
-  el('roiCaption').textContent = roi
-    ? `ROI x ${roi.x0}–${roi.x1 - 1}, y ${roi.y0}–${roi.y1 - 1} (${state.roiMode === 'aligned' ? 'aligned tile' : 'centred on surface pixel'}) = 800 × 200 µm. ${shading}; amber dots: pixels crossed by the track (geometric).`
-    : 'No top-surface hit, so no ROI is defined.';
-  // 'data' only once an event is loaded, so no text claims a truth track before then.
-  document.body.dataset.mode = state.mode === 'data' ? (state.event ? 'data' : 'data-pending') : 'demo';
-  drawRoiPanel(roiCanvas, {
-    trace: ray, roi, traversed,
-    charge: dataMode ? state.charge : null,
-    mode: state.mode,
-  });
+  // 'data' only once an event is loaded: until then the viewport and track readouts are covered.
+  document.body.dataset.mode = state.event ? 'data' : 'data-pending';
 }
 
-/* ---------------- 2D pixel map ---------------- */
+/* ---------------- 2D view ---------------- */
 let mapTransformUsed = null;
 let mapHover = null;
 let mapPointer = null; // last pointer position over the map (CSS px), to re-pick after redraws
+let mapDrag = null; // { x, y, transform } at the start of a drag
 
 function drawMap() {
   const rect = mapCanvas.getBoundingClientRect();
@@ -132,21 +116,24 @@ function drawMap() {
     trace,
     volume: intersectVolume(state),
     traversed: traversedPixels(state),
-    roi: roiWindow(trace.topPixel, state.roiMode),
     charge: state.mode === 'data' ? state.charge : null,
     frameCharge: state.mode === 'data' && state.event ? { sparse: state.event.slices[state.event.slices.length - 1] } : null,
     mode: state.mode,
     progress: state.progress,
     fit: state.mapFit,
+    customWindow: state.mapZoom,
     units: state.axisUnits,
     hover: mapHover,
     dpr,
     show: {
-      grid: state.showGrid, traversed: state.showTraversed, roi: state.showRoi,
+      grid: state.showGrid, traversed: state.showTraversed,
+      trackOff: state.showTrackOff, trackIn: state.showTrackIn,
       top: state.markTop, mid: state.markMid, exit: state.markExit,
-      centroid: state.markCentroid, labels: state.mapLabels,
     },
   });
+  const pannable = canPan(mapTransformUsed);
+  mapCanvas.style.cursor = mapDrag ? 'grabbing' : pannable ? 'grab' : 'crosshair';
+  mapCanvas.style.touchAction = pannable ? 'none' : ''; // a drag moves the map only when zoomed in
   // The window may have moved (new event, edited track): keep the hover on what is under the pointer now.
   if (mapPointer && mapHover) {
     const next = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
@@ -168,11 +155,17 @@ function renderHover() {
   const box = el('mapHover');
   if (!mapHover) { box.textContent = ''; return; }
   const { pixel, x, y } = mapHover;
-  if (!pixel) { box.textContent = `x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm · outside the sensor`; return; }
-  let text = `pixel (${pixel.x}, ${pixel.y}) · x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm`;
+  // Position in the axis units: µm, or pixels from the sensor centre.
+  const where = state.axisUnits === 'px'
+    ? `x ${(x / SENSOR.pitchX).toFixed(2)}, y ${(y / SENSOR.pitchY).toFixed(2)} px from centre`
+    : `x ${x.toFixed(1)} µm, y ${y.toFixed(1)} µm`;
+  if (!pixel) { box.textContent = `${where} · outside the sensor`; return; }
+  let text = `pixel (${pixel.x}, ${pixel.y}) · ${where}`;
   if (state.mode === 'data' && state.charge) {
-    const q = state.charge.dense[pixel.y * SENSOR.pixelsX + pixel.x];
-    text += `\npixelAV charge, slice ${state.charge.slice}: ${q ? `${Math.round(q * 10) / 10} e⁻` : '0 e⁻'}`;
+    const i = pixel.y * SENSOR.pixelsX + pixel.x;
+    const q = state.charge.rawDense[i];
+    const hidden = q && !state.charge.dense[i] ? ' (below threshold)' : '';
+    text += `\npixelAV charge, slice ${state.charge.slice}: ${q ? `${Math.round(q * 10) / 10} e⁻` : '0 e⁻'}${hidden}`;
   }
   box.textContent = text;
 }
@@ -200,16 +193,15 @@ function syncUrl() {
 
 /**
  * The legacy 2D-canvas renderer (?renderer=2d) draws only the original 3D
- * scene: ROI, pixels crossed and labels work in its place only on the 2D map.
+ * scene: pixels crossed work only in the 2D view, and it has no labels toggle.
  * One place decides which controls are enabled.
  */
 function syncLegacyControls() {
-  el('roiMode').disabled = !state.showRoi;
   if (renderer.kind === 'webgl') return;
   const in3d = state.view === '3d';
-  for (const id of ['roiToggle', 'roiMode', 'traversedToggle', 'labelsToggle']) {
-    el(id).disabled = in3d || (id === 'roiMode' && !state.showRoi) || id === 'labelsToggle';
-    el(id).title = in3d ? 'Not drawn by the 2D-canvas fallback; use the 2D map' : '';
+  for (const id of ['traversedToggle', 'labelsToggle']) {
+    el(id).disabled = in3d || id === 'labelsToggle';
+    el(id).title = in3d ? 'Not drawn by the 2D-canvas fallback; use the 2D view' : '';
   }
 }
 
@@ -218,7 +210,7 @@ function setView(view) {
   frame.dataset.view = state.view;
   document.body.dataset.view = state.view;
   setSegment('viewSwitch', state.view);
-  el('viewTag').textContent = state.view === '2d' ? '2D pixel map' : '3D scene';
+  el('viewTag').textContent = state.view === '2d' ? '2D' : '3D';
   el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
   syncLegacyControls();
   syncUrl();
@@ -228,6 +220,7 @@ function setView(view) {
 }
 
 function update() {
+  dataPanel?.syncLockedSlice();
   syncCameraInputs();
   updateReadout();
   if (state.view === '2d') drawMap();
@@ -291,17 +284,12 @@ function attachNumericField(id, min, max) {
     input.value = String(state[id]);
     stop();
     state.progress = 1;
-    el('preset').value = 'manual';
     update();
   });
 }
 
 function bindControls() {
-  attachNumericField('x0', -5000, 5000);
-  attachNumericField('y0', -5000, 5000);
   attachNumericField('z0', 10, 5000);
-  attachNumericField('thetaX', -75, 75);
-  attachNumericField('thetaY', -75, 75);
 
   for (const key of ['azimuth', 'elevation']) {
     el(key).addEventListener('input', (event) => {
@@ -316,11 +304,11 @@ function bindControls() {
   });
 
   for (const [id, key] of [
-    ['gridToggle', 'showGrid'], ['midToggle', 'showMid'], ['roiToggle', 'showRoi'],
+    ['gridToggle', 'showGrid'], ['midToggle', 'showMid'],
     ['traversedToggle', 'showTraversed'],
+    ['trackOffToggle', 'showTrackOff'], ['trackInToggle', 'showTrackIn'],
     ['labelsToggle', 'showLabels'], ['loopToggle', 'loop'],
     ['markTop', 'markTop'], ['markMid', 'markMid'], ['markExit', 'markExit'],
-    ['markCentroid', 'markCentroid'], ['mapLabels', 'mapLabels'],
   ]) {
     el(id).checked = !!state[key];
     el(id).addEventListener('change', (event) => {
@@ -329,16 +317,11 @@ function bindControls() {
       update();
     });
   }
-  el('roiMode').value = state.roiMode;
-  el('roiMode').disabled = !state.showRoi;
-  el('roiMode').addEventListener('change', (event) => {
-    state.roiMode = event.target.value;
-    update();
-  });
 
   bindSegment('viewSwitch', setView);
   bindSegment('mapFit', (value) => {
     state.mapFit = MAP_FITS.includes(value) ? value : 'full';
+    state.mapZoom = null;
     setSegment('mapFit', state.mapFit);
     syncUrl();
     mapHover = null;
@@ -354,22 +337,48 @@ function bindControls() {
     if (!mapTransformUsed) return;
     const rect = mapCanvas.getBoundingClientRect();
     mapPointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    if (mapDrag) {
+      state.mapZoom = panWindow(mapDrag.transform, mapPointer.x - mapDrag.x, mapPointer.y - mapDrag.y);
+      setSegment('mapFit', 'custom');
+      mapHover = null; // no hover readout while dragging
+      drawMap();
+      return;
+    }
     const next = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
     const same = mapHover && next.pixel?.x === mapHover.pixel?.x && next.pixel?.y === mapHover.pixel?.y;
     mapHover = next;
     if (same) renderHover(); else drawMap();
   });
-  mapCanvas.addEventListener('pointerleave', () => { mapHover = null; mapPointer = null; drawMap(); });
-
-  el('preset').addEventListener('change', () => {
-    const preset = PRESETS[el('preset').value];
-    if (!preset) return;
-    Object.assign(state, preset);
-    for (const key of Object.keys(preset)) el(key).value = preset[key];
-    stop();
-    state.progress = 1;
-    update();
+  mapCanvas.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !mapTransformUsed || !canPan(mapTransformUsed)) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    mapDrag = { x: event.clientX - rect.left, y: event.clientY - rect.top, transform: mapTransformUsed };
+    mapCanvas.setPointerCapture(event.pointerId);
+    mapHover = null;
+    drawMap();
   });
+  for (const name of ['pointerup', 'pointercancel']) {
+    mapCanvas.addEventListener(name, () => {
+      if (!mapDrag) return;
+      mapDrag = null;
+      mapHover = mapPointer ? pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y) : null;
+      drawMap();
+    });
+  }
+  mapCanvas.addEventListener('wheel', (event) => {
+    if (!mapTransformUsed || mapDrag) { event.preventDefault(); return; }
+    event.preventDefault(); // zoom the map instead of scrolling the page
+    const rect = mapCanvas.getBoundingClientRect();
+    mapPointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
+    state.mapZoom = zoomWindow(mapTransformUsed, mapPointer.x, mapPointer.y, Math.exp(-pixels * 0.0015));
+    if (!state.mapZoom) state.mapFit = 'full'; // fully zoomed out
+    setSegment('mapFit', state.mapZoom ? 'custom' : state.mapFit); // neither framing button is active while zoomed
+    syncUrl();
+    mapHover = pickPixel(mapTransformUsed, mapPointer.x, mapPointer.y);
+    drawMap();
+  }, { passive: false });
+  mapCanvas.addEventListener('pointerleave', () => { if (mapDrag) return; mapHover = null; mapPointer = null; drawMap(); });
 
   el('play').addEventListener('click', play);
   el('restart').addEventListener('click', () => {
@@ -417,7 +426,7 @@ function bindControls() {
   frame.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', ' '].includes(event.key)) return;
-    if (state.view === '2d' && event.key !== ' ') return; // the 2D map has no camera: leave keys to the page
+    if (state.view === '2d' && event.key !== ' ') return; // the 2D view has no camera: leave keys to the page
     event.preventDefault();
     if (event.key === ' ') { play(); return; }
     const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180;
@@ -481,7 +490,7 @@ if (renderer.kind !== 'webgl') {
 }
 el('viewFocus').disabled = !renderer.setView;
 bindControls();
-const dataPanel = createDataPanel({ state, el, update, stopParticle: stop });
+dataPanel = createDataPanel({ state, el, update, stopParticle: stop });
 dataPanel.bind();
 renderer.resize();
 const params = new URLSearchParams(location.search);
@@ -497,7 +506,6 @@ window.pixelSensorDebug = Object.freeze({
   get trace() { return traceParticle(state); },
   get volume() { return intersectVolume(state); },
   get traversed() { return traversedPixels(state); },
-  get roi() { return roiWindow(traceParticle(state).topPixel, state.roiMode); },
   get state() { return { ...state }; },
   get renderer() { return renderer.kind; },
   get event() { return state.event ? { fileId: state.event.fileId, eventIndex: state.event.eventIndex, truth: state.event.truth } : null; },

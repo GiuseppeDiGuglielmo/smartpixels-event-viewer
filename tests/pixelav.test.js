@@ -178,3 +178,28 @@ test('defensive decoding: unsafe manifest paths, corrupt offsets and oversized c
   v.setUint16(4, 1, true); v.setUint32(8, 0xFFFFFFFE, true); // absurd count
   assert.throws(() => decodeEvent(rec), /exceeds the record/);
 });
+
+test('locked charge: no charge before entry, slices spread over the silicon, round trip', async () => {
+  const { lockedSlice, lockedProgress } = await import('../src/pixelav.js');
+  assert.equal(lockedSlice(0.59, 0.6, 1, 20), null);
+  assert.equal(lockedSlice(0.6, 0.6, 1, 20), 0);
+  assert.equal(lockedSlice(1, 0.6, 1, 20), 19);
+  assert.equal(lockedSlice(1, 0.6, 0.8, 20), 19, 'stays on the last slice after a side exit');
+  assert.equal(lockedSlice(0.7, 0.7, 0.7, 20), 19, 'degenerate range');
+  for (let t = 0; t < 20; t++) assert.equal(lockedSlice(lockedProgress(t, 0.6, 1, 20), 0.6, 1, 20), t);
+});
+
+test('display threshold keeps |q| above it for both signs and leaves the slice untouched', async () => {
+  const { applyThreshold, chargeStats } = await import('../src/pixelav.js');
+  const slice = { indices: Uint16Array.of(1, 2, 3, 4), charges: Float32Array.of(500, -500, 100, -100) };
+  assert.equal(applyThreshold(slice, 0), slice);
+  const shown = applyThreshold(slice, 100);
+  assert.deepEqual([...shown.indices], [1, 2]);
+  assert.deepEqual([...shown.charges], [500, -500]);
+  assert.ok(shown.indices instanceof Uint16Array && shown.charges instanceof Float32Array);
+  assert.equal(slice.indices.length, 4);
+  const stats = chargeStats(slice, 100);
+  assert.equal(stats.nAbove, 2);
+  assert.equal(stats.total, 600, 'totals are not thresholded');
+  assert.equal(stats.net, 0);
+});

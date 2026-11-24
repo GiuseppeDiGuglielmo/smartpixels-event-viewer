@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SENSOR, DEFAULT_STATE, traceParticle, pixelCenter, intersectVolume, traversedPixels } from '../src/geometry.js';
 import {
-  FULL_WINDOW, MAP_FITS, MAJOR, crossingMarkers, mapWindow, mapTransform, pickPixel, tickStep, drawPixelMap,
-  axisTicks, indexStep, gridLines, axisBaselines,
+  FULL_WINDOW, MAP_FITS, CROSSED_COLOR, CENTER_X, CENTER_Y, crossingMarkers, mapWindow, mapTransform, pickPixel, tickStep, drawPixelMap,
+  zoomWindow, panWindow, canPan, axisTicks, indexStep, gridLines, axisBaselines,
 } from '../src/pixelMap2d.js';
 
 const close = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `expected ${a} ≈ ${b}`);
@@ -94,27 +94,29 @@ test('tick steps are 1/2/2.5/5 × 10^n and at least the requested spacing', () =
 function recordingContext() {
   const fills = [];
   const strokes = [];
+  const lines = [];
   const ctx = new Proxy({ fillStyle: '', strokeStyle: '', measureText: (s) => ({ width: s.length * 6 }) }, {
     get(target, key) {
       if (key in target) return target[key];
       if (key === 'fillRect') return (x, y, w, h) => fills.push({ style: target.fillStyle, x, y, w, h });
       if (key === 'strokeRect') return () => strokes.push(target.strokeStyle);
+      if (key === 'stroke') return () => lines.push(target.strokeStyle);
       return () => {};
     },
     set(target, key, value) { target[key] = value; return true; },
   });
-  return { ctx, fills, strokes };
+  return { ctx, fills, strokes, lines };
 }
 
-const showAll = { grid: true, traversed: true, roi: true, top: true, mid: true, exit: true, centroid: true, labels: true };
+const showAll = { grid: true, traversed: true, top: true, mid: true, exit: true };
 
 function drawWith(extra) {
-  const { ctx, fills, strokes } = recordingContext();
+  const { ctx, fills, strokes, lines } = recordingContext();
   const trace = traceParticle(DEFAULT_STATE);
   drawPixelMap(ctx, 1000, 525, {
     trace, volume: intersectVolume(DEFAULT_STATE), traversed: traversedPixels(DEFAULT_STATE), show: showAll, ...extra,
   });
-  return { fills, strokes, trace };
+  return { fills, strokes, lines, trace };
 }
 
 test('demo mode never paints charge colours; data mode paints exactly the charged pixels', () => {
@@ -217,28 +219,20 @@ test('the default framing is the whole 48 × 192 array, and a square canvas show
   close(t.visible.y0, -1200); close(t.visible.y1, 1200);
 });
 
-test('pixel-unit ticks sit at pixel centres, zero-based, never beyond 47 / 191', () => {
+test('pixel-unit ticks count from the sensor centre: 0 at 0 µm, ±24 in x, ±96 in y', () => {
   const t = mapTransform(FULL_WINDOW, 872, 856);
   const ticks = axisTicks(t.visible, t.scale, 'px');
-  assert.equal(ticks.x[0].text, '0');
-  close(ticks.x[0].at, -1200 + 25);
-  close(ticks.y[0].at, -1200 + 6.25);
-  for (const { at, text } of ticks.x) {
-    const i = Number(text);
-    assert.ok(i >= 0 && i <= 47);
-    close(at, pixelCenter(i, 0).x);
+  for (const [list, pitch, end] of [[ticks.x, SENSOR.pitchX, 24], [ticks.y, SENSOR.pitchY, 96]]) {
+    assert.equal(list[0].text, String(-end));
+    assert.equal(list.at(-1).text, String(end));
+    assert.equal(list.find((k) => k.at === 0).text, '0');
+    for (const { at, text } of list) close(at, Number(text) * pitch);
+    const step = Number(list[1].text) - Number(list[0].text);
+    assert.ok([1, 2, 4, 8, 16, 32].includes(step));
+    assert.ok(step * pitch * t.scale >= 40);
   }
-  for (const { at, text } of ticks.y) {
-    const i = Number(text);
-    assert.ok(i >= 0 && i <= 191);
-    close(at, pixelCenter(0, i).y);
-  }
-  assert.match(ticks.title.x, /pixel index/);
-  // Steps are powers of two and leave at least 40 canvas px between labels.
-  const sx = Number(ticks.x[1].text) - Number(ticks.x[0].text);
-  const sy = Number(ticks.y[1].text) - Number(ticks.y[0].text);
-  assert.ok([1, 2, 4, 8, 16, 32, 64].includes(sx) && [1, 2, 4, 8, 16, 32, 64].includes(sy));
-  assert.ok(sx * SENSOR.pitchX * t.scale >= 40 && sy * SENSOR.pitchY * t.scale >= 40);
+  assert.ok(ticks.x.every((k) => !Object.is(Number(k.text), -0) && k.text !== '-0'));
+  assert.match(ticks.title.x, /pixels from centre/);
   assert.equal(indexStep(SENSOR.pitchY, 1000), 1);
 });
 
@@ -251,15 +245,18 @@ test('µm ticks stay on the sensor footprint even when the canvas is wider', () 
   assert.match(ticks.title.y, /µm/);
 });
 
-test('grid lines: every boundary when dense enough, majors every 16 pixels always kept', () => {
-  const all = gridLines(0, 48, SENSOR.pitchX, 1);
+test('grid lines: every boundary when dense, thinned from the centre, central axis always kept', () => {
+  assert.equal(CENTER_X, 24);
+  assert.equal(CENTER_Y, 96);
+  close(-SENSOR.halfX + CENTER_X * SENSOR.pitchX, 0);
+  close(-SENSOR.halfY + CENTER_Y * SENSOR.pitchY, 0);
+  const all = gridLines(0, 48, SENSOR.pitchX, 1, CENTER_X);
   assert.equal(all.length, 49);
-  assert.deepEqual(all.filter((g) => g.major).map((g) => g.i), [0, 16, 32, 48]);
-  const thin = gridLines(0, 192, SENSOR.pitchY, 0.05); // 0.6 px apart: thinned
+  assert.deepEqual(all.filter((g) => g.center).map((g) => g.i), [24]);
+  const thin = gridLines(0, 192, SENSOR.pitchY, 0.05, CENTER_Y); // 0.6 px apart: thinned
   assert.ok(thin.length < 193);
-  assert.deepEqual(thin.filter((g) => g.major).map((g) => g.i), Array.from({ length: 13 }, (_, k) => k * MAJOR));
-  // Thinned lines are evenly spaced, also across the major lines.
-  const gaps = new Set(gridLines(0, 40, SENSOR.pitchY, 0.07).slice(1).map((g, k, a) => g.i - (k ? a[k - 1].i : 0)));
+  assert.deepEqual(thin.filter((g) => g.center).map((g) => g.i), [96]);
+  const gaps = new Set(thin.slice(1).map((g, k) => g.i - thin[k].i));
   assert.equal(gaps.size, 1);
 });
 
@@ -271,4 +268,62 @@ test('axes sit on the footprint edges on a non-square canvas, and on the padding
   assert.ok(left > t.pad.left);
   const zoom = mapTransform({ x0: -100, x1: 100, y0: -100, y1: 100 }, 1000, 600);
   assert.deepEqual(axisBaselines(zoom), { left: zoom.pad.left, bottom: 600 - zoom.pad.bottom });
+});
+
+test('the off-sensor and in-sensor trajectory toggles hide only their own part', () => {
+  const off = 'rgba(255,155,110,0.55)';
+  const inside = 'rgba(255,240,160,0.9)';
+  const all = drawWith({}).lines;
+  assert.ok(all.includes(off) && all.includes(inside));
+  const noOff = drawWith({ show: { ...showAll, trackOff: false } }).lines;
+  assert.ok(!noOff.includes(off) && noOff.includes(inside));
+  const noIn = drawWith({ show: { ...showAll, trackIn: false } }).lines;
+  assert.ok(noIn.includes(off) && !noIn.includes(inside));
+});
+
+test('crossed pixels get a red border and no fill, and follow their toggle', () => {
+  const n = traversedPixels(DEFAULT_STATE).length;
+  const count = (r) => r.strokes.filter((c) => c === CROSSED_COLOR).length;
+  const on = drawWith({});
+  assert.equal(count(on), n);
+  assert.equal(on.fills.filter((f) => f.style === CROSSED_COLOR || /255,180,106/.test(f.style)).length, 0);
+  assert.equal(count(drawWith({ show: { ...showAll, traversed: false } })), 0);
+});
+
+test('wheel zoom keeps the point under the cursor, stays on the sensor and is bounded', () => {
+  const full = mapTransform(FULL_WINDOW, 900, 900);
+  const [px, py] = full.toCanvas(300, -200);
+  const win = zoomWindow(full, px, py, 2);
+  const zoomed = mapTransform(win, 900, 900);
+  close(zoomed.scale, full.scale * 2, 1e-9);
+  const at = zoomed.toUm(px, py);
+  close(at.x, 300, 1e-6);
+  close(at.y, -200, 1e-6);
+  // Zooming at a corner never shows area beyond the footprint.
+  const [cx, cy] = full.toCanvas(-1200, 1200);
+  const corner = mapTransform(zoomWindow(full, cx, cy, 3), 900, 900);
+  assert.ok(corner.visible.x0 >= -1200 - 1e-6 && corner.visible.y1 <= 1200 + 1e-6);
+  // Zoom-in limit: one 50 µm pixel across the plot.
+  const deep = mapTransform(zoomWindow(full, px, py, 1e6), 900, 900);
+  close(deep.visible.x1 - deep.visible.x0, (900 - 72) / deep.scale, 1e-6);
+  assert.ok(Math.min(deep.visible.x1 - deep.visible.x0, deep.visible.y1 - deep.visible.y0) >= SENSOR.pitchX - 1e-6);
+  // Zooming out past the full sensor returns to the default framing.
+  assert.equal(zoomWindow(zoomed, px, py, 0.1), null);
+  assert.equal(zoomWindow(full, px, py, 0.9), null);
+});
+
+test('drag moves the zoomed map with the pointer and stops at the sensor edges', () => {
+  const full = mapTransform(FULL_WINDOW, 900, 900);
+  assert.equal(canPan(full), false);
+  const t = mapTransform({ x0: -200, x1: 200, y0: -200, y1: 200 }, 900, 900);
+  assert.equal(canPan(t), true);
+  const [px, py] = t.toCanvas(50, 30);
+  const moved = mapTransform(panWindow(t, 40, -25), 900, 900);
+  close(moved.scale, t.scale, 1e-9);
+  const [qx, qy] = moved.toCanvas(50, 30);
+  close(qx, px + 40, 1e-6);
+  close(qy, py - 25, 1e-6);
+  const far = mapTransform(panWindow(t, 1e6, -1e6), 900, 900); // content dragged right and up: view at the bottom-left
+  close(far.visible.x0, -1200, 1e-6);
+  close(far.visible.y0, -1200, 1e-6);
 });

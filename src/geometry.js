@@ -166,6 +166,22 @@ export function progressAtZ(trace, z) {
   return (trace.start.z - z) / (trace.start.z - trace.bottom.z);
 }
 
+/**
+ * The straight path split at the silicon volume, in animation-progress units:
+ * { kind: 'off' | 'in', from, to }. 'in' is the chord inside the sensor; 'off'
+ * is everything else, including the part after a side exit.
+ */
+export function trackSegments(trace, volume) {
+  if (!volume) return [{ kind: 'off', from: 0, to: 1 }];
+  const enter = progressAtZ(trace, volume.entry.z);
+  const leave = progressAtZ(trace, volume.exit.z);
+  const segments = [];
+  if (enter > 0) segments.push({ kind: 'off', from: 0, to: enter });
+  segments.push({ kind: 'in', from: enter, to: leave });
+  if (leave < 1) segments.push({ kind: 'off', from: leave, to: 1 });
+  return segments;
+}
+
 export function pointAtProgress(trace, fraction) {
   const f = clamp(fraction, 0, 1);
   return point(
