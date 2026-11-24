@@ -127,7 +127,7 @@ const server = createServer(async (request, response) => {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   server.listen(port, host, () => {
-    process.stdout.write(`Pixel Sensor Simulator: http://${host}:${port}/\n`);
+    process.stdout.write(`SmartPixels Event Viewer: http://${host}:${port}/\n`);
     process.stdout.write(`pixelAV data: ${dataRoot} → ${DATA_PREFIX}\n`);
     if (!LOOPBACK.has(host)) process.stderr.write(`WARNING: HOST=${host} serves ${projectRoot} to the network.\n`);
   });

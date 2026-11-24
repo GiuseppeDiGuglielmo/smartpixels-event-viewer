@@ -5,7 +5,7 @@
  * pixel appears 50 × 12.5 µm. +x to the right, +y UP (same as the 3D top view);
  * pixel indices are zero-based and never transposed.
  *
- * Pixel colours: pixelAV SIMULATED charge (pixelShading), positive and negative.
+ * Pixel colours: PixelAV SIMULATED charge (pixelShading), positive and negative.
  * Everything else is geometry from geometry.js: the projected
  * track, the pixels it crosses, and the crossing points at the top surface
  * (z = 0), the midplane (z = −50) and the exit plane (z = −100).
@@ -275,7 +275,7 @@ export function drawPixelMap(ctx, width, height, options) {
     ctx.fillRect(x + inset, y + inset, Math.max(0.5, w - 2 * inset), Math.max(0.5, h - 2 * inset));
   };
 
-  // Pixel shading: pixelAV simulated charge only.
+  // Pixel shading: PixelAV simulated charge only.
   if (shading === 'charge') {
     const { indices, charges } = charge.sparse;
     for (let i = 0; i < indices.length; i++) {

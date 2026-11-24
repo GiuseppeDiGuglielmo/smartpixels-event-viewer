@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Interactive 2D and 3D visualization of a 48 × 192 silicon pixel sensor and straight-line particle tracks.">
-  <title>Pixel Sensor Viewer</title>
+  <meta name="description" content="Interactive 2D and 3D viewer for PixelAV-simulated smart-pixel events on a 48 × 192 silicon pixel sensor.">
+  <title>SmartPixels Event Viewer</title>
   <link rel="stylesheet" href="./src/styles.css">
   <!-- Three.js r187 is vendored under vendor/three (MIT) so the app runs offline with no npm install. -->
   <script type="importmap">
@@ -18,7 +18,7 @@
 </head>
 <body data-view="2d" data-mode="data-pending">
 <header class="topbar">
-<div class="brand"><h1>Pixel Sensor</h1><span class="spec">48 × 192 pixels · 50 × 12.5 µm · 100 µm thick</span></div>
+<div class="brand"><h1>SmartPixels Event Viewer</h1><span class="spec">48 × 192 pixels · 50 × 12.5 µm · 100 µm thick</span></div>
 <div class="topbar-actions">
 <div class="seg" role="group" aria-label="View" id="viewSwitch"><button type="button" id="view2d" data-value="2d" aria-pressed="true">2D</button><button type="button" id="view3d" data-value="3d" aria-pressed="false">3D</button></div>
 <button type="button" id="savePng" title="Save the current view as a PNG image">Save PNG</button>
@@ -36,8 +36,8 @@
 <div class="map-hover view-3d" id="canvasTip"></div>
 </div>
 <div class="stage">
-<div class="canvas-frame" id="frame" tabindex="-1" data-view="2d"><canvas id="scene" tabindex="0" aria-label="Rotatable 2D-canvas projection of the pixel sensor (fallback renderer). Drag to orbit, wheel to zoom."></canvas><canvas id="map2d" class="map2d" tabindex="0" role="img" aria-label="2D top view of the 48 by 192 pixel array. Plus and minus zoom, arrow keys move the view, 0 shows the full sensor, space plays."></canvas><div class="no-event" id="noEvent" role="status">Loading pixelAV data…</div></div>
-<div class="colorbar data-only" title="pixelAV simulated charge in electrons, signed log scale, fixed per event"><i id="chargeRampLegend"></i><div class="charge-ticks" id="chargeTicks"></div><span class="colorbar-title">pixelAV charge (e⁻, log)</span></div>
+<div class="canvas-frame" id="frame" tabindex="-1" data-view="2d"><canvas id="scene" tabindex="0" aria-label="Rotatable 2D-canvas projection of the pixel sensor (fallback renderer). Drag to orbit, wheel to zoom."></canvas><canvas id="map2d" class="map2d" tabindex="0" role="img" aria-label="2D top view of the 48 by 192 pixel array. Plus and minus zoom, arrow keys move the view, 0 shows the full sensor, space plays."></canvas><div class="no-event" id="noEvent" role="status">Loading PixelAV data…</div></div>
+<div class="colorbar data-only" title="PixelAV simulated charge in electrons, signed log scale, fixed per event"><i id="chargeRampLegend"></i><div class="charge-ticks" id="chargeTicks"></div><span class="colorbar-title">PixelAV charge (e⁻, log)</span></div>
 </div>
 <div class="transport">
 <div class="t-actions"><button class="primary" type="button" id="play">▶ Play</button><button type="button" id="restart">↺ Restart</button></div>
@@ -74,8 +74,8 @@
 </div></details>
 <details class="section"><summary>About this view</summary><div class="about">
 <p>Dataset: <b id="dataDataset">—</b></p>
-<p>Charge is <b>pixelAV simulated</b> output in electrons, cumulative over 20 time slices. The line is the event's truth track: straight, with no field, scattering or energy loss.</p>
-<p>Pixel addresses are zero-based (x 0–47, y 0–191). The pixel axis counts from the sensor centre. pixelAV (x, y) origin: centre of pixel (23, 95), see <code>docs/PIXELAV_DATA.md</code>.</p>
+<p>Charge is <b>PixelAV simulated</b> output in electrons, cumulative over 20 time slices. The line is the event's truth track: straight, with no field, scattering or energy loss.</p>
+<p>Pixel addresses are zero-based (x 0–47, y 0–191). The pixel axis counts from the sensor centre. PixelAV (x, y) origin: centre of pixel (23, 95), see <code>docs/PIXELAV_DATA.md</code>.</p>
 <p class="view-2d">Keys on the map: <kbd>+</kbd> <kbd>−</kbd> zoom, arrows move, <kbd>0</kbd> full sensor, <kbd>Space</kbd> play.</p><p class="view-3d">Keys on the scene: <kbd>+</kbd> <kbd>−</kbd> zoom, arrows rotate, <kbd>0</kbd> full sensor, <kbd>Space</kbd> play. Z is stretched for display only.</p><p class="view-3d">Renderer: <span id="rendererBadge">loading…</span></p>
 <p>Links: <code>?view=3d</code>, <code>units=px</code>, <code>fit=track</code>, <code>renderer=2d</code>.</p>
 </div></details>

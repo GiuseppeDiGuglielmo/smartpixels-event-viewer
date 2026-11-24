@@ -189,7 +189,7 @@ export function createRenderer({ canvas, getState }) {
       }
     }
 
-    // pixelAV SIMULATED charge (data mode): colour the non-zero pixels of the current slice.
+    // PixelAV SIMULATED charge (data mode): colour the non-zero pixels of the current slice.
     const shading = pixelShading(s);
     if (shading === 'charge') {
       const { indices, charges } = s.charge.sparse; // only the non-zero pixels

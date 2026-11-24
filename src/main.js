@@ -69,7 +69,7 @@ async function createBestRenderer() {
         },
       });
     } catch (error) {
-      console.warn('[pixel-sensor] WebGL renderer unavailable, using 2D canvas fallback:', error);
+      console.warn('[smartpixels-event-viewer] WebGL renderer unavailable, using 2D canvas fallback:', error);
       legacyCanvas.hidden = false;
     }
   }
@@ -438,7 +438,7 @@ function bindControls() {
       : renderer.exportPNG ? renderer.exportPNG() : legacyCanvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pixel-sensor-${state.view}-x${state.x0}-y${state.y0}-tx${state.thetaX}-ty${state.thetaY}.png`;
+    link.download = `smartpixels-${state.view}-x${state.x0}-y${state.y0}-tx${state.thetaX}-ty${state.thetaY}.png`;
     link.click();
   });
 

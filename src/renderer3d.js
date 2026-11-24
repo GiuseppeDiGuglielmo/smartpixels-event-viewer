@@ -283,7 +283,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         let g = 92;
         let b = 124;
         let a = 120;
-        // pixelAV SIMULATED charge replaces the pad colour (data mode only).
+        // PixelAV SIMULATED charge replaces the pad colour (data mode only).
         const q = dataCharge ? dataCharge.dense[i] : 0;
         if (q !== 0) { // negative charge is drawn too
           [r, g, b] = chargeColor(q, dataCharge.scale);
@@ -466,7 +466,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       trackGroup.add(borders);
     }
 
-    // pixelAV SIMULATED charge as bars above the pads: height ∝ charge (linear),
+    // PixelAV SIMULATED charge as bars above the pads: height ∝ charge (linear),
     // colour = log-scale ramp. Display only; the bar height axis is not z.
     if (pixelShading(s) === 'charge' && s.showChargeBars) {
       const { dense, scale } = s.charge;

@@ -1,8 +1,8 @@
 {
-  "name": "pixel-sensor-simulator",
-  "version": "0.9.0",
+  "name": "smartpixels-event-viewer",
+  "version": "0.10.0",
   "private": true,
-  "description": "Interactive 48 × 192 silicon pixel sensor viewer: straight-line track geometry plus pixelAV simulated events (Three.js r187 vendored, no npm install)",
+  "description": "Interactive 2D and 3D viewer for PixelAV-simulated smart-pixel events (Three.js r187 vendored, no npm install)",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",

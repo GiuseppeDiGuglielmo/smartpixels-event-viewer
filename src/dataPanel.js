@@ -1,9 +1,9 @@
 /**
- * pixelAV simulated events: event browser, time-slice control and the
+ * PixelAV simulated events: event browser, time-slice control and the
  * simulated-event readout. Loads events lazily through eventSource.js (one
  * HTTP Range request per event, small LRU caches) — never whole files.
  *
- * pixelAV is the only data source, and every charge label says "pixelAV
+ * PixelAV is the only data source, and every charge label says "PixelAV
  * simulated".
  */
 import { createEventSource } from './eventSource.js';
@@ -108,7 +108,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       ['Max pixel', c ? `${fmt(c.stats.max, 0)} e⁻` : '—'],
       ['offset1 · offset2', `${fmt(t.offset1, 0)} · ${fmt(t.offset2, 0)}`],
       ['at edge (orig · uncent.)', `${bool(t.original_atEdge)} · ${bool(t.uncentered_atEdge)}`],
-      ['truth entry (pixelAV)', `${fmt(t['x-entry'], 1)}, ${fmt(t['y-entry'], 1)} µm`],
+      ['truth entry (PixelAV)', `${fmt(t['x-entry'], 1)}, ${fmt(t['y-entry'], 1)} µm`],
     ];
     // The three numbers used to compare events stay visible; the rest is in Event details.
     el('sumCharge').textContent = c ? `${Math.round(c.stats.total).toLocaleString('en-US')} e⁻` : '—';

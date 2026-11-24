@@ -20,7 +20,7 @@ Open **Event details** for the truth values and charge statistics, and **Track**
 
 ## Reading the charge
 
-Pixels are coloured by **pixelAV simulated charge** in electrons, on a signed log scale:
+Pixels are coloured by **PixelAV simulated charge** in electrons, on a signed log scale:
 
 - **Viridis** (purple to yellow) is positive charge.
 - **Rose** is negative charge. It is real simulation output, and appears in the early time slices.

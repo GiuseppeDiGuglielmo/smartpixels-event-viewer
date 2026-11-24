@@ -1,8 +1,10 @@
-# Pixel Sensor Viewer
+# SmartPixels Event Viewer
 
-An interactive browser viewer for how a charged particle crosses a **48 × 192 silicon pixel sensor** (50 × 12.5 µm pixels, 100 µm thick). It shows each event's truth track together with the charge collected per pixel, in 2D and 3D, using **pixelAV simulated** data.
+Interactive 2D and 3D viewer for **PixelAV-simulated smart-pixel events**. It shows how a charged particle crosses a 48 × 192 silicon pixel sensor (50 × 12.5 µm pixels, 100 µm thick), with each event's truth track and the charge collected per pixel.
 
-![The viewer's 2D view showing one pixelAV event](assets/preview-pixelav.png)
+This project **displays** PixelAV output. It does not run or replace PixelAV.
+
+![The viewer's 2D view showing one PixelAV event](assets/preview-pixelav.png)
 
 ![The 3D view of the same sensor](assets/preview-3d.png)
 
@@ -11,15 +13,15 @@ An interactive browser viewer for how a charged particle crosses a **48 × 192 s
 You need **Node.js 20 or newer** (22 recommended), **git** and a browser with WebGL 2. There is no `npm install` and no build step.
 
 ```bash
-git clone <repository-url> pixel-sensor-simulator
-cd pixel-sensor-simulator
+git clone git@github.com:GiuseppeDiGuglielmo/smartpixels-event-viewer.git
+cd smartpixels-event-viewer
 npm test          # optional: checks your setup
 npm run sample    # starts the viewer with 6 example events
 ```
 
 Open **http://127.0.0.1:5173/**. Press `Ctrl+C` in the terminal to stop the server.
 
-The example events are real pixelAV events stored in the repository. To browse the full dataset, see **[Use the full dataset](#use-the-full-dataset)**.
+The example events are real PixelAV events stored in the repository. To browse the full dataset, see **[Use the full dataset](#use-the-full-dataset)**.
 
 ## Use the full dataset
 
@@ -91,15 +93,15 @@ y(z) = y0 + (z0 - z) * tan(thetaY)
 
 ## What this is not
 
-- **The charge is pixelAV output.** The viewer does not simulate energy deposition, drift, diffusion, induced signal or noise, and adds no pixel response of its own.
+- **The charge is PixelAV output.** The viewer does not simulate energy deposition, drift, diffusion, induced signal or noise, and adds no pixel response of its own.
 - **The track is a straight line**, with no magnetic field, multiple scattering, delta rays or energy loss.
 - **Locking the particle to the charge is a display mapping**, not a physical time axis.
-- **Three pixelAV conventions are still open** (origin, readout face and a y offset of about −16 µm). See [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md).
+- **Three PixelAV conventions are still open** (origin, readout face and a y offset of about −16 µm). See [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md).
 
 ## Project layout
 
 ```text
-pixel-sensor-simulator/
+smartpixels-event-viewer/
 ├── index.html                Page and import map for the vendored Three.js
 ├── src/
 │   ├── geometry.js           Source of truth: constants, track math, pixel mapping (no DOM)
@@ -107,7 +109,7 @@ pixel-sensor-simulator/
 │   ├── pixelMap2d.js         2D view: layout, axes, markers, drawing
 │   ├── renderer3d.js         3D view (Three.js)
 │   ├── renderer.js           Fallback canvas renderer (no WebGL, or ?renderer=2d)
-│   ├── pixelav.js            pixelAV decoding, truth mapping, charge statistics
+│   ├── pixelav.js            PixelAV decoding, truth mapping, charge statistics
 │   ├── eventSource.js        One-event-at-a-time loader (HTTP Range, LRU caches)
 │   ├── dataPanel.js          Event browser, time slices, readouts
 │   ├── chargeColors.js       Signed log colour scale
@@ -133,6 +135,14 @@ pixel-sensor-simulator/
 Run `npm test` after every change; a change that only alters screenshots does not validate the geometry. Project rules, including the detector constants and axis conventions, are in [CLAUDE.md](CLAUDE.md). Do not add a made-up pixel response, and do not change the detector dimensions or axis conventions without updating the specification and tests.
 
 **Upgrading Three.js:** The vendored files are copied verbatim from the npm package (`npm pack three@<version>`): `build/three.module.js`, `build/three.core.js`, `examples/jsm/controls/OrbitControls.js` → `addons/controls/`, and `examples/jsm/renderers/CSS2DRenderer.js` → `addons/renderers/`. Replace all four together, then update `vendor/three/README.txt`.
+
+## References
+
+- **PixelAV:** M. Swartz, "CMS pixel simulations", *Nucl. Instrum. Meth. A* **511** (2003) 88–91, [doi:10.1016/S0168-9002(03)01757-1](https://doi.org/10.1016/S0168-9002(03)01757-1). See also [CERN Document Server record 687440](https://cds.cern.ch/record/687440?ln=en).
+- **Datasets:** D. Shekar, M. Swartz, J. Dickinson, M. A. Wadud, *Smartpixels co-design datasets*, Zenodo (2025), [doi:10.5281/zenodo.17180303](https://doi.org/10.5281/zenodo.17180303), CC BY 4.0.
+- **Smart pixels:** J. Yoo et al., "Smart pixel sensors: towards on-sensor filtering of pixel clusters with deep learning", *Mach. Learn.: Sci. Technol.* **5** (2024), [doi:10.1088/2632-2153/ad6a00](https://doi.org/10.1088/2632-2153/ad6a00).
+
+How these sources relate to the data shown here is in [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md#published-datasets-and-references).
 
 ## License
 

@@ -1,5 +1,5 @@
 /**
- * Memory-bounded access to converted pixelAV events.
+ * Memory-bounded access to converted PixelAV events.
  *
  *  - manifest.json is fetched once (a few KB);
  *  - a file's index (~0.9 MB for 5000 events: offsets + truth) is fetched only
@@ -57,7 +57,7 @@ export async function createEventSource({
   }
 
   const manifestResponse = await fetchImpl(`${base}manifest.json`);
-  if (!manifestResponse.ok) throw new Error(`No converted pixelAV data at ${base} (HTTP ${manifestResponse.status}).`);
+  if (!manifestResponse.ok) throw new Error(`No converted PixelAV data at ${base} (HTTP ${manifestResponse.status}).`);
   const manifest = validateManifest(await manifestResponse.json());
   const indexes = new LRU(maxIndexes);
   const pendingIndexes = new Map();

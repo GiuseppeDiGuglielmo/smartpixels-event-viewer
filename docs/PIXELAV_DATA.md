@@ -1,6 +1,6 @@
-# pixelAV simulated events in the viewer
+# PixelAV simulated events in the viewer
 
-The viewer shows real **pixelAV simulated** events:
+The viewer shows real **PixelAV simulated** events:
 - the truth straight track,
 - the collected charge per pixel (electrons), on the pads and as bars,
 - the charge's evolution over the 20 time slices,
@@ -31,6 +31,27 @@ You can also link straight to an event: `http://127.0.0.1:5173/?file=test/part.0
 The converter writes to `data/pixelav/` by default (git-ignored). It is incremental: unchanged files are skipped.
 - To write elsewhere, use `--out DIR`.
 - To serve another folder, run `PIXELAV_DATA=DIR npm run dev`.
+
+## Published datasets and references
+
+- **PixelAV:** M. Swartz, "CMS pixel simulations", *Nucl. Instrum. Meth. A* 511 (2003) 88–91, [doi:10.1016/S0168-9002(03)01757-1](https://doi.org/10.1016/S0168-9002(03)01757-1). See also [CERN CDS record 687440](https://cds.cern.ch/record/687440?ln=en).
+- **Datasets:** *Smartpixels co-design datasets*, Zenodo, [doi:10.5281/zenodo.17180303](https://doi.org/10.5281/zenodo.17180303) (CC BY 4.0), with coordinate diagrams `SP_coordinates.pdf` and `y-local_coordinate.pdf`.
+
+**The dataset used here is not in that record.** The Zenodo files are 21 × 13 arrays (`recon3D`, shaped `(20, 13, 21)` as time, y, x), about 171 GB in total. This viewer's `dataset_2su_…_48x192_50x12P5` has a larger window and extra columns (`offset1`, `offset2`, `*_atEdge`). The project maintainer confirms it was produced with the same settings as the record (200 ps slices, 3.8 T, barrel), so the statements below apply to it.
+
+| Topic | Zenodo record | Checked on this dataset (1,500 events) |
+|---|---|---|
+| Sensor | S2 is 50 × 12.5 × 100 µm, 100 V bias | Same pitch and thickness |
+| Time slices | 20 slices of 200 ps (4 ns in total) | 20 slices; charge is cumulative and reaches its final value at slice 10 |
+| Magnetic field | 3.8 T, parallel to sensor X (barrel) | The unexplained charge shift is along Y, as a Lorentz drift in this field would be |
+| Track position | Entry and midplane impact points, in µm | `midplane = entry − 50 · cot`, exact |
+| Angles | `cotAlpha` in x–z, `cotBeta` in y–z (bending plane) | Used directly for the drawn track |
+| `n_x`, `n_y`, `n_z` | Described as a unit vector | **Not unit length here** (0.04 to 36), so the viewer does not use them for the direction |
+| `number_eh_pairs` | Pairs created in the active volume | Equals the final total charge |
+| `pt` | GeV; the sign gives the particle's charge sign | Range −4.7 to 4.9 |
+| `y-local` | mm from the array centre to the centre of a flat module | Shown as stored |
+
+**Still open after reading these sources:** the (x, y) origin on the 48 × 192 array, the readout face, the size and sign of the expected Lorentz drift, the start time of slice 0, and the charge units. The record states no temperature, threshold or noise. It also lists the irradiated sensors inconsistently (S2 in the text, S1 in its table).
 
 ## Why convert, and how memory stays bounded
 
@@ -68,9 +89,9 @@ All values are little-endian.
 
 Pixel index: `p = iy·48 + ix`, and the source column is `t·9216 + p`. This was verified on the data: the charge centroid correlates with truth at r = 0.996, while the transposed layout gives r ≈ 0. So the indices are the viewer's zero-based (ix, iy) with no transpose.
 
-## Coordinate mapping (pixelAV → viewer)
+## Coordinate mapping (PixelAV → viewer)
 
-| pixelAV | Viewer |
+| PixelAV | Viewer |
 |---|---|
 | top surface `z = 100`, midplane `50`, bottom `0` | `z − 100` → 0 / −50 / −100 |
 | `cotAlpha = n_x/n_z`, `cotBeta = n_y/n_z` (n_z < 0, moving toward −z) | `tan θX = −cotAlpha`, `tan θY = −cotBeta` |
@@ -81,19 +102,21 @@ All of these are covered by `tests/pixelav.test.js`, which uses real events. For
 
 **Origin convention: please confirm.** On test/part.0, the charge centroid minus the truth midplane, measured relative to the array centre, is (−24.7, −22.2) µm. It does not depend on cotα, cotβ, pT or the offsets, and it is the same in all 100 files: x from −25.8 to −24.3 µm, y from −22.4 to −22.0 µm (`qaCentroidMinusTruthMidplaneUm` in the manifest, measured relative to the array centre). Taking the origin at the centre of pixel (23, 95) removes the x part exactly, since 25 µm is half the 50 µm pitch. It leaves a constant ≈ −16 µm shift in y, which looks like Lorentz drift, and the viewer deliberately does **not** remove it. The UI shows "centroid − truth mid" for every event. To change the convention, edit the single constant `PIXELAV_ORIGIN`.
 
-**Readout face.** The charge is drawn on the entry face, which is the viewer's top (z = 0) and pixelAV z = 100. The data support this. For steep tracks (|cotα| > 5, 800 events), the charge collected in the first time slice has its centroid at 0.31 of the way along the track from the entry face, while the final charge sits at 0.50. So the charge produced near the entry face reaches the pixels first, which puts the implants on that face. Please confirm with the pixelAV configuration.
+A later check on 1,500 events found a weak dependence of the y shift on cotβ (about −1.4 µm per unit of cotβ), which a pure constant would not show. Recheck it when confirming the origin.
+
+**Readout face.** The charge is drawn on the entry face, which is the viewer's top (z = 0) and PixelAV z = 100. The data support this. For steep tracks (|cotα| > 5, 800 events), the charge collected in the first time slice has its centroid at 0.31 of the way along the track from the entry face, while the final charge sits at 0.50. So the charge produced near the entry face reaches the pixels first, which puts the implants on that face. Please confirm with the PixelAV configuration.
 
 Data angles reach about ±84° (|cotα| up to about 9.8).
 
 ## What is simulated and what is not
 
-- **Simulated (pixelAV):** per-pixel collected charge in electrons, cumulative over 20 time slices, and the truth track parameters.
+- **Simulated (PixelAV):** per-pixel collected charge in electrons, cumulative over 20 time slices, and the truth track parameters.
 - **Display only:**
   - the colour map (log scale up to the event's maximum pixel),
   - the bar heights (linear in charge, with the event's maximum shown as 400 µm of display height; this height is not a z coordinate),
   - the Z exaggeration,
   - the start height above the sensor (`z0`, which only moves the start point along the truth line).
-- There is no demo source or made-up pixel response; pixelAV is the only data source.
+- There is no demo source or made-up pixel response; PixelAV is the only data source.
 - **Negative charge is real data and is drawn.** In a 2,000-event sample (4 files), every event has negative pixels in slices 0–10, none from slice 11 on, down to −2,333 e⁻ and typically about 8 % of the event's maximum. The 3D charge bars still show positive charge only.
 - **Not interpreted:** columns such as `pt`, `y-local`, `offset1/2` and `*_atEdge` are shown as stored. From the data, `offset1` tracks y-midplane and `offset2` tracks x-midplane (r ≈ 0.98).
 

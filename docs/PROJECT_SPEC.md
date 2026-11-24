@@ -41,7 +41,7 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 ## 3. User experience (implemented)
 
 - Volumetric translucent slab (WebGL) with a 48 × 192 pixel-pad texture and grid on top, midplane, backside, axis triad, and edge index labels.
-- Track origin and direction come from the loaded pixelAV event's truth; only the display start height z₀ is editable.
+- Track origin and direction come from the loaded PixelAV event's truth; only the display start height z₀ is editable.
 - Orbit, pan and zoom camera (OrbitControls), synced with the toolbar and keyboard. Framing: full sensor or zoom to track. Directions: iso, top, X–Z, Y–Z.
 - Play, pause, loop and seek the particle path. Top impact, midplane crossing and exit markers, with their pixels, appear as the particle reaches each plane.
 - Pixels crossed by the track; label toggle.
@@ -53,14 +53,14 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 
 The 3D view uses Three.js with a perspective camera. Physical µm are mapped to scene units only in `src/sceneTransform.js`: `(x, z·stretch, −y)·0.01`, a proper rotation with no mirroring. Z is exaggerated to improve readability, and this affects the display only.
 
-No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Charge is shown only from pixelAV simulated events, which are the only data source; the illustrative Gaussian and geometric demo source were removed.
+No actual particle/material interaction is simulated. The line is straight, with no magnetic field, multiple scattering, or energy loss. Charge is shown only from PixelAV simulated events, which are the only data source; the illustrative Gaussian and geometric demo source were removed.
 
 ## 5. Future feature proposals (not implemented)
 
 1. **WebGL renderer:** *done in v0.2.0* (orbit camera, transparent volume). Still open: selectable pixels, a clipping plane, and a multi-track event view.
 2. **More physical path intersection:** *done* as the separate `intersectVolume` / `traversedPixels`. Still open: deciding whether a side entry should count as a HIT (a scientific decision).
 3. **Charge cloud / drift:** optional idealized visualization of ionization and carrier drift, clearly labeled illustrative unless physics solver is integrated.
-4. **External data:** *done in v0.3.0* for pixelAV parquet datasets (converted to a sparse, Range-addressable format). See `docs/PIXELAV_DATA.md`.
+4. **External data:** *done in v0.3.0* for PixelAV parquet datasets (converted to a sparse, Range-addressable format). See `docs/PIXELAV_DATA.md`.
 5. **ROI and ML:** 16 × 16 ROI analysis, center-finding, projected impact at z=−50, and reconstruction comparison.
 6. **Publication output:** repeatable camera poses, adjustable colors, annotated image export and timeline video frames.
 

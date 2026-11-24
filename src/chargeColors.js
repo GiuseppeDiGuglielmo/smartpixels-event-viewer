@@ -86,7 +86,7 @@ export const RAMP_CSS = `linear-gradient(90deg, ${STOPS.map(([p, c]) => `rgb(${c
 
 /**
  * Single rule for what colours the pixel pads, shared by every renderer:
- * pixelAV SIMULATED charge in data mode once an event is loaded, otherwise
+ * PixelAV SIMULATED charge in data mode once an event is loaded, otherwise
  * nothing. There is no illustrative pixel response any more, so the pads never
  * show anything that could be mistaken for charge.
  */

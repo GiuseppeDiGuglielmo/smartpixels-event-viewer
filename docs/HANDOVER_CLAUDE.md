@@ -6,22 +6,23 @@ This page is for whoever continues this project with an AI coding agent. It cove
 - how the first two milestones were run with oh-my-claudecode (OMC),
 - how to check the agent's work before trusting it.
 
-## 1. Where the project stands (v0.9.0)
+## 1. Where the project stands (v0.10.0)
 
 | Milestone | Status | Where to read about it |
 |---|---|---|
 | 1. Three.js volumetric viewer (rotate/zoom, editable track, top/mid/exit animation, 16×16 ROI) | Done, reviewed | `README.md`, `docs/PROJECT_SPEC.md` |
-| 2. pixelAV simulated events (Parquet → sparse files, one event per HTTP Range request) | Done, reviewed | `docs/PIXELAV_DATA.md` |
+| 2. PixelAV simulated events (Parquet → sparse files, one event per HTTP Range request) | Done, reviewed | `docs/PIXELAV_DATA.md` |
 | 3. Illustrative Gaussian removed; 2D pixel map with surface/midplane/exit markers (v0.4.0) | Done | `README.md` ("2D pixel map") |
 | 4. 2D map is the default view (full 48 × 192 array, µm / pixel axes); controls regrouped by view (v0.5.0) | Done | `README.md` ("Layout") |
 | 5. View renamed 2D; central x = 0 / y = 0 axes highlighted; pixel axis counted from the centre (v0.6.0) | Done | `README.md` ("2D view") |
 | 6. One-screen layout: map, colour bar and playback always visible; controls ordered by use; keyboard zoom and pan (v0.7.0) | Done | `README.md` ("Layout") |
 | 7. 3D aligned with 2D: camera in the toolbar, clean default scene, central axes (v0.8.0) | Done | `docs/USER_GUIDE.md` |
 | 8. Clone-and-run docs, `npm run sample`, `requirements.txt` (v0.9.0) | Done | `docs/SETUP.md` |
+| 9. Renamed SmartPixels Event Viewer; references and Zenodo comparison (v0.10.0) | Done | `docs/PIXELAV_DATA.md` |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
-1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
-2. Readout pixels are assumed to sit on the track's entry face (pixelAV z = 100, viewer z = 0).
+1. PixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
+2. Readout pixels are assumed to sit on the track's entry face (PixelAV z = 100, viewer z = 0).
 3. A constant ≈ −16 µm y residual (probably Lorentz drift) is shown, not corrected.
 
 Candidate next tasks: event filtering by truth (cotα, cotβ, pT), negative charge in the 3D bars, picking pixels in 3D, and exporting video frames for talks.
@@ -101,14 +102,14 @@ When autopilot cannot get a human answer, it records each guess as an assumption
 
 ## 5. Prompting: what worked
 
-- **Name the constraint, not just the feature.** For example: "keep `src/geometry.js` the source of truth", "only pixelAV data may colour pixels", "don't transpose pixels".
+- **Name the constraint, not just the feature.** For example: "keep `src/geometry.js` the source of truth", "only PixelAV data may colour pixels", "don't transpose pixels".
 - **Ask for evidence when the data's conventions are unknown.** Milestone 2 derived the pixel column order, the coordinate frame and the origin from the data itself, using correlations and residuals, and wrote the evidence down. Insist on that rather than plausible guesses.
 - **Ask for browser QA, not only unit tests.** The rapid-click race in event stepping was found only by driving the real UI.
 - Example opening prompt for a new session:
 
   > Read CLAUDE.md, README.md, docs/PIXELAV_DATA.md and docs/HANDOVER_CLAUDE.md. Run `npm test`.
   > Then add event filtering by cotα/cotβ/pT using the truth columns already in each file's index (no new downloads).
-  > Keep pixelAV as the only charge source, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
+  > Keep PixelAV as the only charge source, add tests, verify in the browser with scripts/qa-browser.mjs, update the docs.
 
 ## 6. How to check the agent's work
 
@@ -132,7 +133,7 @@ Then compare against the guardrails in `CLAUDE.md`:
 - the slope formulas;
 - zero-based pixel indices, no transpose;
 - Z stretch is display-only;
-- only pixelAV simulated charge colours pixels.
+- only PixelAV simulated charge colours pixels.
 
 A change that only alters screenshots does not prove the geometry is correct.
 

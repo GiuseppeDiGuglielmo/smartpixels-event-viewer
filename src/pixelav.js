@@ -1,15 +1,15 @@
 /**
- * pixelAV simulated events: binary decoding and coordinate mapping.
+ * PixelAV simulated events: binary decoding and coordinate mapping.
  * Pure functions (no DOM, no fetch) so they run in Node tests and the browser.
  *
  * Data come from scripts/pixelav_convert.py (format "pixelav-sparse-v1").
- * Charge values are pixelAV SIMULATED electrons, cumulative over time slices.
+ * Charge values are PixelAV SIMULATED electrons, cumulative over time slices.
  * This is real simulation output; it is the only charge the viewer shows
- * (pixelAV is the only data source).
+ * (PixelAV is the only data source).
  *
  * Coordinate conventions (verified on test/part.0, see docs/PIXELAV_DATA.md):
  *  - pixel index p = iy*48 + ix (same zero-based ix/iy as geometry.js; no transpose)
- *  - pixelAV z: top surface z=100, midplane 50, bottom 0  →  viewer z = z − 100
+ *  - PixelAV z: top surface z=100, midplane 50, bottom 0  →  viewer z = z − 100
  *  - cotAlpha = n_x/n_z, cotBeta = n_y/n_z with n_z < 0 (travel toward −z), so the
  *    viewer slopes are tan(thetaX) = −cotAlpha, tan(thetaY) = −cotBeta
  *  - x/y origin: see PIXELAV_ORIGIN (a documented, reversible convention)
@@ -23,7 +23,7 @@ export const PIXELAV_Z_TOP = 100;
 export const DATA_MODE_DEFAULT_Z0 = 150;
 
 /**
- * Viewer position (µm) of the pixelAV (x, y) = (0, 0) point: the centre of
+ * Viewer position (µm) of the PixelAV (x, y) = (0, 0) point: the centre of
  * pixel (23, 95). With this choice the charge centroid matches the truth
  * midplane in x (≈0 µm); a constant ≈ −16 µm shift remains in y, which is
  * NOT removed (plausibly Lorentz drift). PENDING confirmation with the dataset
@@ -59,7 +59,7 @@ export function validateManifest(manifest) {
 export function decodeIndex(buffer, truthColumns) {
   const view = new DataView(buffer);
   const magic = String.fromCharCode(...new Uint8Array(buffer, 0, 8));
-  if (magic !== INDEX_MAGIC) throw new Error('Not a pixelAV index file (bad magic).');
+  if (magic !== INDEX_MAGIC) throw new Error('Not a PixelAV index file (bad magic).');
   const nEvents = view.getUint32(8, true);
   const nTruth = view.getUint32(12, true);
   if (truthColumns && truthColumns.length !== nTruth) throw new Error('Index truth columns do not match the manifest.');
@@ -205,14 +205,14 @@ export function lockedProgress(t, enter, leave, n) {
   return n > 1 ? enter + (t / (n - 1)) * (leave - enter) : leave;
 }
 
-/** pixelAV truth (x, y) → viewer µm. */
+/** PixelAV truth (x, y) → viewer µm. */
 export function pixelavToViewerXY(x, y) {
   return { x: x + PIXELAV_ORIGIN.x, y: y + PIXELAV_ORIGIN.y };
 }
 
 /**
  * Straight-line parameters for the viewer from a truth record:
- * the line passes through the truth top-surface entry (pixelAV z = 100) with
+ * the line passes through the truth top-surface entry (PixelAV z = 100) with
  * slopes −cotAlpha / −cotBeta, starting z0 µm above the top surface.
  */
 export function truthToParticle(truth, z0 = DATA_MODE_DEFAULT_Z0) {
@@ -222,7 +222,7 @@ export function truthToParticle(truth, z0 = DATA_MODE_DEFAULT_Z0) {
     if (!Number.isFinite(v)) throw new TypeError('Truth record is missing x-entry / y-entry / direction.');
   }
   if (Number.isFinite(truth['z-entry']) && Math.abs(truth['z-entry'] - PIXELAV_Z_TOP) > 1e-6) {
-    throw new RangeError(`Expected entry at the top surface (pixelAV z = ${PIXELAV_Z_TOP}), got ${truth['z-entry']}.`);
+    throw new RangeError(`Expected entry at the top surface (PixelAV z = ${PIXELAV_Z_TOP}), got ${truth['z-entry']}.`);
   }
   const top = pixelavToViewerXY(truth['x-entry'], truth['y-entry']);
   // x(z) = x0 + (z0 − z)·tanθX with tanθX = −cotAlpha  ⇒  x0 = x_top + z0·cotAlpha

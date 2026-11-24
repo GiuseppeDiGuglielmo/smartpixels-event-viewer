@@ -161,7 +161,7 @@ test('event source still works (slower) when a server ignores Range', async () =
 test('missing data directory gives a clear error', async () => {
   await assert.rejects(
     createEventSource({ baseUrl: 'http://x/none/', fetchImpl: async () => new Response('', { status: 404 }) }),
-    /No converted pixelAV data/,
+    /No converted PixelAV data/,
   );
 });
 

@@ -1,6 +1,6 @@
 # Claude Code — Project instructions
 
-You are working in an interactive **particle-to-pixel silicon detector visualization** project. The user is a detector/ASIC researcher and needs a credible visual illustration of how a charged particle crosses a pixel sensor, in addition to a path to real simulated data.
+You are working in **SmartPixels Event Viewer**, an interactive **particle-to-pixel silicon detector visualization** project. It displays PixelAV output; it does not simulate. The user is a detector/ASIC researcher and needs a credible visual illustration of how a charged particle crosses a pixel sensor, in addition to a path to real simulated data.
 
 ## First actions
 
@@ -18,7 +18,7 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 - Particle starts at `(x0,y0,z0)`, with `z0 > 0` (above sensor). Define angles as independent slopes: `x(z) = x0 + (z0-z)*tan(thetaX)`, `y(z) = y0 + (z0-z)*tan(thetaY)`.
 - Zero-based pixel coordinates: X 0..47, Y 0..191. Do not silently transpose axes or pixels. The 2D axis in pixel units is a distance from the sensor centre (x −24..24, y −96..96), not a pixel address.
 - Visual Z stretch is rendering only. All computations use physical µm.
-- pixelAV is the only data source: the illustrative Gaussian and the geometric demo source were removed. Do not add a made-up pixel response; the only charge shown is pixelAV simulated data.
+- PixelAV is the only data source: the illustrative Gaussian and the geometric demo source were removed. Do not add a made-up pixel response; the only charge shown is PixelAV simulated data.
 - Do not quietly replace top-surface-hit semantics. If you add side entry / volume intersection, separate it clearly and test it.
 
 ## Code organization
@@ -30,7 +30,7 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 - `src/pixelMap2d.js`: 2D top-view pixel map (the default view; `?view=3d` for 3D): pure layout/marker/label/axis-tick helpers plus canvas drawing. Tested in `tests/pixelMap2d.test.js`.
 - `docs/SETUP.md`, `docs/USER_GUIDE.md`: install and usage docs. Update them when commands or controls change.
 - `index.html` UI rule: controls that apply to one view carry `view-2d` / `view-3d` and are hidden in the other view; one name and colour per concept (Surface z = 0, Midplane z = −50 µm, Exit z = −100 µm) across toggles, legend, labels and readout.
-- `src/pixelav.js`, `src/eventSource.js`, `src/dataPanel.js`: pixelAV simulated-event mode (decoder + mapping, Range loader, UI). Charge colours come only from loaded simulated events (`pixelShading`).
+- `src/pixelav.js`, `src/eventSource.js`, `src/dataPanel.js`: PixelAV simulated-event mode (decoder + mapping, Range loader, UI). Charge colours come only from loaded simulated events (`pixelShading`).
 - `scripts/pixelav_convert.py`: Parquet → sparse converter (Python + pyarrow, see `requirements.txt`). Format and conventions: `docs/PIXELAV_DATA.md`.
 - `vendor/three/`: unmodified Three.js r187 (MIT), loaded via the import map in index.html. No npm install.
 - `src/main.js`: UI state, input validation, animation, interaction.
@@ -48,4 +48,4 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 
 ## Recommended next task
 
-Read `docs/HANDOVER_CLAUDE.md` for the current state, the open decisions (pixelAV origin and readout face) and the verification steps, including `npm run qa:browser` for UI checks. `docs/CLAUDE_START_PROMPT.md` is the completed milestone-1 prompt; don't re-run it. Ask the user for changes only if the requested behavior is scientifically ambiguous; preserve original defaults otherwise.
+Read `docs/HANDOVER_CLAUDE.md` for the current state, the open decisions (PixelAV origin and readout face) and the verification steps, including `npm run qa:browser` for UI checks. `docs/CLAUDE_START_PROMPT.md` is the completed milestone-1 prompt; don't re-run it. Ask the user for changes only if the requested behavior is scientifically ambiguous; preserve original defaults otherwise.

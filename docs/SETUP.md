@@ -25,8 +25,8 @@ node --version
 ## 2. Get the code and check it
 
 ```bash
-git clone <repository-url> pixel-sensor-simulator
-cd pixel-sensor-simulator
+git clone git@github.com:GiuseppeDiGuglielmo/smartpixels-event-viewer.git
+cd smartpixels-event-viewer
 npm test
 ```
 
@@ -38,11 +38,11 @@ All tests should pass. They need neither the dataset nor Python.
 npm run sample
 ```
 
-Open **http://127.0.0.1:5173/**. You should see the sensor with the charge of event 0, and be able to step through 6 real pixelAV events. Stop the server with `Ctrl+C`.
+Open **http://127.0.0.1:5173/**. You should see the sensor with the charge of event 0, and be able to step through 6 real PixelAV events. Stop the server with `Ctrl+C`.
 
 ## 4. Use the full dataset
 
-The dataset is not in the repository. Ask the project maintainers for access. It should look like this:
+The 48 × 192 dataset is not in the repository. Ask the project maintainers for access. The published [Smartpixels co-design datasets](https://zenodo.org/records/17180303) are related but use 21 × 13 arrays and a different file layout, so the converter cannot read them yet (see [PIXELAV_DATA.md](PIXELAV_DATA.md#published-datasets-and-references)). The dataset should look like this:
 
 ```text
 dataset_2su_-9_9_48x192_50x12P5_parquets/
@@ -63,8 +63,8 @@ pip install -r requirements.txt
 Or with conda:
 
 ```bash
-conda create -n pixel-sensor python=3.11
-conda activate pixel-sensor
+conda create -n smartpixels-viewer python=3.11
+conda activate smartpixels-viewer
 pip install -r requirements.txt
 ```
 
@@ -127,7 +127,7 @@ ssh -L 5173:127.0.0.1:5173 user@remote-host
 Then, in that SSH session:
 
 ```bash
-cd pixel-sensor-simulator
+cd smartpixels-event-viewer
 npm run dev
 ```
 
@@ -146,7 +146,7 @@ Converted data only needs regenerating if `docs/PIXELAV_DATA.md` reports a forma
 
 | Symptom | Cause and fix |
 |---|---|
-| The viewer says **No converted pixelAV data** | You ran `npm run dev` without converted data. Use `npm run sample`, or convert the dataset (section 4). |
+| The viewer says **No converted PixelAV data** | You ran `npm run dev` without converted data. Use `npm run sample`, or convert the dataset (section 4). |
 | `EADDRINUSE` when starting | The port is taken, often by a viewer already running. Stop it, or use `PORT=5174 npm run sample`. |
 | `node: command not found`, or errors on an old Node | Install Node 20 or newer (section 1). |
 | `python3: command not found` | Install Python 3.9 or newer. |
