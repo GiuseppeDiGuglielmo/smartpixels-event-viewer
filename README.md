@@ -6,7 +6,7 @@ An interactive browser application for visualizing a charged particle traveling 
 
 ![3D WebGL view](assets/preview-3d.png)
 
-![Focus on the impact pixel](assets/preview-3d-focus.png)
+![3D view zoomed to the track](assets/preview-3d-focus.png)
 
 > **Important:** The ray trajectory, plane crossings, volume entry/exit and per-pixel path lengths are **geometric** calculations of a straight line. The only pixel charge shown is **pixelAV simulated** output, loaded from converted events; the earlier illustrative Gaussian (v0.4.0) and geometric demo source were removed.
 >
@@ -46,15 +46,15 @@ The browser then fetches **one event per HTTP Range request** (about 4 KB) and n
 
 ## What works today
 
-**Layout.** One screen, no page scrolling on desktop. The top bar holds the **2D | 3D** switch and **Save PNG**. The viewport holds its toolbar (framing, axis units, hover readout), the map with a colour bar beside it, and the playback bar. The side panel follows how often things are used: **Event** (file, previous/next/random, charge, pixels and angles at a glance), **Show** (trajectory, crossing points, pixels and the charge threshold), then collapsible **Event details**, **Track** and **About this view**. In 3D, a **3D scene** section adds the camera controls. On narrow screens everything stacks into one column.
+**Layout.** One screen, no page scrolling on desktop. The top bar holds the **2D | 3D** switch and **Save PNG**. The viewport holds its toolbar (framing, axis units, hover readout), the map with a colour bar beside it, and the playback bar. The side panel follows how often things are used: **Event** (file, previous/next/random, charge, pixels and angles at a glance), **Show** (trajectory, crossing points, pixels and the charge threshold), then collapsible **Event details**, **Track** and **About this view**. In 3D, the same toolbar holds framing, camera direction and Z stretch, and **Show** gains a **3D scene** group. On narrow screens everything stacks into one column.
 
 **3D view (Three.js / WebGL; `?view=3d`)**
 
-- Volumetric, translucent 2400 × 2400 × 100 µm silicon slab; top surface carries the 48 × 192 pixel pads (one texel per pixel) and grid lines, with major lines every 16 pixels. Backside plane at z = −100 µm and an optional dashed midplane at z = −50 µm.
-- Orientation aids: a physical **+X / +Y / +Z** axis triad, `col 0 / col 47` and `row 0 / row 191` labels at the array edges, and dimension labels. These make an accidental X/Y transpose easy to spot.
-- **Orbit** (drag), **pan** (right-drag or shift-drag), and **zoom** (wheel or pinch), with damping. Zoom goes down to single 50 × 12.5 µm pixels. The orbit and elevation sliders and the keyboard (arrow keys, `+`/`−`, space to play) stay in sync with the mouse. Elevation goes to −89°, so you can look at the exit from below.
-- View presets: **Top**, **Side X–Z**, **Side Y–Z**, **Focus impact**, and **Reset camera**. The camera refits automatically when the trajectory changes, unless you have panned.
-- Animated particle with glow and a trail. The part of the path inside silicon is drawn brighter. As the particle passes each plane, its marker and the pixel at that crossing appear:
+- Volumetric, translucent 2400 × 2400 × 100 µm silicon slab; top surface carries the 48 × 192 pixel pads (one texel per pixel) and grid lines with the central x = 0 and y = 0 axes highlighted, as in 2D. Backside plane at z = −100 µm and an optional dashed midplane at z = −50 µm.
+- Orientation aids: an always-labelled physical **+X / +Y / +Z** axis triad, plus optional **Dimensions** (`col 0 / col 47`, `row 0 / row 191` and sensor sizes). These make an accidental X/Y transpose easy to spot.
+- **Orbit** (drag), **pan** (right-drag or shift-drag), and **zoom** (wheel or pinch), with damping. Zoom goes down to single 50 × 12.5 µm pixels. The toolbar shows the live azimuth and elevation, and the keyboard works too (arrows rotate, `+`/`−` zoom, `0` full sensor, space plays). Elevation goes to −89°, so you can look at the exit from below.
+- Toolbar: **Full sensor | Zoom to track** (same names as 2D), direction **Iso | Top | X–Z | Y–Z**, and **Z** stretch. A direction keeps a close-up on the track. The camera refits automatically when the trajectory changes, unless you have panned.
+- Animated particle, a plain white circle as in 2D, with a trail. The part of the path inside silicon is drawn brighter. As the particle passes each plane, its marker and the pixel at that crossing appear:
   - **surface** (z = 0; cyan ring, cell outline, and a translucent 50 × 12.5 × 100 µm pixel column),
   - **midplane** (z = −50 µm; blue),
   - **exit** (z = −100 µm; orange).

@@ -380,11 +380,11 @@ export function drawPixelMap(ctx, width, height, options) {
     labels.push({ text, ax: x, ay: y, x: x + 12, y: y - 9, color: m.color });
   }
 
-  // Particle position during the animation.
+  // Particle position during the animation: a plain white circle.
   if (reach < 1) {
     const now = pointAtProgress(trace, reach);
     const [x, y] = P(now.x, now.y);
-    ctx.fillStyle = '#ffe1b0';
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
   }
 

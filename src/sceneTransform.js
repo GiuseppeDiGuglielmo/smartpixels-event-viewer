@@ -41,3 +41,15 @@ export function anglesFromDirection({ x, y, z }) {
     elevation: Math.asin(Math.max(-1, Math.min(1, z / r))) * 180 / Math.PI,
   };
 }
+
+/** Named camera directions [azimuth, elevation] in degrees. */
+export const CAMERA_PRESETS = Object.freeze({ iso: [35, 30], top: [-90, 89], xz: [-90, 0], yz: [0, 0] });
+
+/** Preset the camera is on (within 1°), or null after a free orbit. Elevations are clamped to the renderer's range. */
+export function matchingPreset(azimuth, elevation, elevationMin = -89, elevationMax = 89) {
+  const near = (a, b) => Math.abs(((a - b + 180) % 360 + 360) % 360 - 180) < 1;
+  for (const [name, [az, el]] of Object.entries(CAMERA_PRESETS)) {
+    if (near(azimuth, az) && Math.abs(elevation - Math.min(elevationMax, Math.max(elevationMin, el))) < 1) return name;
+  }
+  return null;
+}

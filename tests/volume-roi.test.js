@@ -6,6 +6,7 @@ import {
 } from '../src/geometry.js';
 import { PRESETS } from '../src/presets.js';
 import { trackSegments } from '../src/geometry.js';
+import { CAMERA_PRESETS, matchingPreset } from '../src/sceneTransform.js';
 import {
   SCENE_SCALE, toScene, fromScene, cameraDirection, anglesFromDirection,
 } from '../src/sceneTransform.js';
@@ -224,4 +225,12 @@ test('trajectory segments split at the silicon and cover the whole path', () => 
   assert.equal(segs[0].from, 0);
   assert.equal(segs.at(-1).to, 1);
   for (let i = 1; i < segs.length; i++) assert.equal(segs[i].from, segs[i - 1].to);
+});
+
+test('camera presets are recognised within 1°, and not after a free orbit', () => {
+  for (const [name, [az, el]] of Object.entries(CAMERA_PRESETS)) assert.equal(matchingPreset(az + 0.4, el - 0.4), name);
+  assert.equal(matchingPreset(35, 45), null);
+  assert.equal(matchingPreset(270, 89), 'top', 'azimuth wraps around');
+  assert.equal(matchingPreset(-90, 85, 5, 85), 'top', 'clamped elevation of the legacy renderer');
+  assert.equal(matchingPreset(0, 5, 5, 85), 'yz');
 });

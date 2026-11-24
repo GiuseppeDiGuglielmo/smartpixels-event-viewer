@@ -2,6 +2,7 @@ import {
   SENSOR, DEFAULT_STATE, clamp, traceParticle, intersectVolume, traversedPixels,
 } from './geometry.js';
 import { createRenderer } from './renderer.js';
+import { CAMERA_PRESETS, matchingPreset } from './sceneTransform.js';
 import { drawPixelMap, pickPixel, zoomWindow, panWindow, canPan, MAP_FITS, AXIS_UNITS } from './pixelMap2d.js';
 import { createDataPanel, DATA_DEFAULTS } from './dataPanel.js';
 
@@ -16,7 +17,8 @@ const VIEW_DEFAULTS = Object.freeze({
   showTraversed: false,
   showTrackOff: false,
   showTrackIn: false,
-  showLabels: true,
+  showMid: false,
+  showLabels: false, // 3D dimension annotations
   loop: false,
   // 2D view
   view: '2d',
@@ -37,11 +39,13 @@ const DURATION_MS = 3200;
 let renderer = null;
 let dataPanel = null;
 
-function syncCameraInputs() {
-  el('azimuth').value = String(Math.round(state.azimuth));
-  el('elevation').value = String(Math.round(state.elevation));
-  el('azLabel').textContent = `${Math.round(state.azimuth)}°`;
-  el('elLabel').textContent = `${Math.round(state.elevation)}°`;
+/** 3D toolbar: the active framing and direction, and the live camera angles. */
+function syncCameraUi() {
+  if (!renderer) return;
+  const hint = renderer.kind === 'webgl' ? 'drag to rotate · right-drag to move · scroll to zoom' : 'drag to rotate · scroll to zoom';
+  el('canvasTip').textContent = `az ${Math.round(state.azimuth)}° · el ${Math.round(state.elevation)}° · ${hint}`;
+  setSegment('scenePreset', matchingPreset(state.azimuth, state.elevation, ELEVATION_MIN, ELEVATION_MAX) ?? 'custom');
+  setSegment('sceneFit', renderer.framing ? renderer.framing() : Math.abs(state.zoom - 1) < 0.02 ? 'full' : 'custom');
 }
 
 async function createBestRenderer() {
@@ -61,7 +65,7 @@ async function createBestRenderer() {
           state.azimuth = azimuth;
           state.elevation = elevation;
           state.zoom = zoom;
-          syncCameraInputs();
+          syncCameraUi();
         },
       });
     } catch (error) {
@@ -89,7 +93,6 @@ function updateReadout() {
   el('exitPosition').textContent = crossing(ray.bottom, ray.exitPixel);
   el('volumePath').textContent = volume ? `${FACE[volume.entryFace]} → ${FACE[volume.exitFace]}` : 'does not cross silicon';
   el('volumeLength').textContent = volume ? `${volume.length.toFixed(1)} µm · ${traversed.length} pixel${traversed.length === 1 ? '' : 's'}` : '—';
-  el('stretchBadge').textContent = `Z display ×${state.zStretch}`;
   el('zLabel').textContent = `×${state.zStretch}`;
   el('rendererBadge').textContent = renderer?.kind === 'webgl' ? 'WebGL · Three.js' : '2D canvas fallback';
   el('timeline').value = String(Math.round(state.progress * 1000));
@@ -236,7 +239,6 @@ function setView(view) {
   frame.dataset.view = state.view;
   document.body.dataset.view = state.view;
   setSegment('viewSwitch', state.view);
-  el('canvasTip').textContent = renderer.kind === 'webgl' ? 'Drag orbit · right-drag pan · scroll zoom' : 'Drag to orbit · scroll to zoom';
   syncLegacyControls();
   syncUrl();
   mapHover = null;
@@ -246,7 +248,7 @@ function setView(view) {
 
 function update() {
   dataPanel?.syncLockedSlice();
-  syncCameraInputs();
+  syncCameraUi();
   updateReadout();
   if (state.view === '2d') drawMap();
   else renderer.render();
@@ -316,13 +318,6 @@ function attachNumericField(id, min, max) {
 function bindControls() {
   attachNumericField('z0', 10, 5000);
 
-  for (const key of ['azimuth', 'elevation']) {
-    el(key).addEventListener('input', (event) => {
-      state[key] = Number(event.target.value);
-      renderer.syncCamera?.();
-      update();
-    });
-  }
   el('zStretch').addEventListener('input', (event) => {
     state.zStretch = Number(event.target.value);
     update();
@@ -413,25 +408,29 @@ function bindControls() {
     update();
   });
 
-  const setCamera = (azimuth, elevation, view) => {
-    state.azimuth = azimuth;
-    state.elevation = clamp(elevation, ELEVATION_MIN, ELEVATION_MAX);
+  // 3D framing: whole sensor, or close on the track's impact point.
+  const showFullScene = () => {
     state.zoom = DEFAULT_STATE.zoom;
-    if (renderer.setView) renderer.setView(view);
+    renderer.setView?.('reset');
     update();
   };
-  el('resetView').addEventListener('click', () => {
-    state.zStretch = DEFAULT_STATE.zStretch;
-    el('zStretch').value = String(state.zStretch);
-    setCamera(DEFAULT_STATE.azimuth, DEFAULT_STATE.elevation, 'reset');
-  });
-  el('viewTop').addEventListener('click', () => setCamera(-90, 89, 'reset'));
-  el('viewSideX').addEventListener('click', () => setCamera(-90, 0, 'reset'));
-  el('viewSideY').addEventListener('click', () => setCamera(0, 0, 'reset'));
-  el('viewFocus').addEventListener('click', () => {
+  bindSegment('sceneFit', (value) => {
+    if (value === 'full') { showFullScene(); return; }
     if (!renderer.setView) return;
     renderer.setView('focus');
     update();
+  });
+  // Direction: keeps a close-up on the track, otherwise reframes the whole sensor.
+  bindSegment('scenePreset', (value) => {
+    const [azimuth, elevation] = CAMERA_PRESETS[value];
+    state.azimuth = azimuth;
+    state.elevation = clamp(elevation, ELEVATION_MIN, ELEVATION_MAX);
+    if (renderer.framing?.() === 'track') {
+      renderer.setView('focus');
+      update();
+    } else {
+      showFullScene();
+    }
   });
   el('savePng').addEventListener('click', () => {
     const url = state.view === '2d'
@@ -449,8 +448,8 @@ function bindControls() {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', '0', ' '].includes(event.key)) return;
     if (event.key === ' ') { event.preventDefault(); play(); return; }
     if (state.view === '2d') { if (mapKey(event.key)) event.preventDefault(); return; }
-    if (event.key === '0') return;
     event.preventDefault();
+    if (event.key === '0') { showFullScene(); return; }
     const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180;
     if (event.key === 'ArrowLeft') state.azimuth = wrap(state.azimuth - 5);
     if (event.key === 'ArrowRight') state.azimuth = wrap(state.azimuth + 5);
@@ -502,15 +501,14 @@ function bindLegacyPointer() {
 renderer = await createBestRenderer();
 frame.dataset.renderer = renderer.kind;
 if (renderer.kind !== 'webgl') {
-  for (const id of ['viewTop', 'viewSideX', 'viewSideY']) el(id).title = 'Orbit presets (2D fallback: approximate)';
   ELEVATION_MIN = 5;
   ELEVATION_MAX = 85;
   ZOOM_MIN = 0.45;
   ZOOM_MAX = 5;
-  el('elevation').min = '5';
-  el('elevation').max = '85';
+  const track = el('sceneFit').querySelector('[data-value="track"]');
+  track.disabled = true;
+  track.title = 'Available with WebGL';
 }
-el('viewFocus').disabled = !renderer.setView;
 bindControls();
 dataPanel = createDataPanel({ state, el, update, stopParticle: stop });
 dataPanel.bind();

@@ -35,8 +35,9 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:#50c9df;cursor:po
 
 /* ---- viewport ---- */
 .toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s2);min-height:48px;padding:var(--s2) var(--s4);border-bottom:1px solid var(--line)}
-.map-hover{flex:1;min-width:0;text-align:right;font:12px var(--mono);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.map-hover:empty::before{content:"Scroll to zoom · drag to move · hover a pixel";font-family:system-ui,sans-serif;color:var(--muted)}
-.renderer-tag{margin-left:auto;color:var(--muted);font-size:12px}
+.map-hover{flex:1;min-width:0;text-align:right;font:12px var(--mono);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.z-control{display:inline-flex;align-items:center;gap:var(--s1);flex:none;min-height:32px;margin-left:var(--s1);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}.z-control input{width:84px}.z-control b{min-width:26px;font:600 12px var(--mono);color:var(--text)}
+#canvasTip{color:var(--muted);font-family:system-ui,sans-serif}
+.map-hover:empty::before{content:"Scroll to zoom · drag to move · hover a pixel";font-family:system-ui,sans-serif;color:var(--muted)}
 .stage{flex:1;min-height:0;display:flex;justify-content:center;container-type:size;background:var(--surface-2)}
 .canvas-frame{position:relative;flex:1;min-width:0;height:100%;background:var(--surface-2)}
 /* The map's padding is 72 px across and 56 px down, so this makes its plot exactly square. */
@@ -45,10 +46,8 @@ body[data-view="2d"] .canvas-frame{flex:none;width:min(100cqw - 96px,100cqh + 16
 #scene,.scene-webgl{cursor:grab;outline-offset:-3px}#scene:active,.scene-webgl:active{cursor:grabbing}#scene[hidden]{display:none}
 .map2d{cursor:crosshair;touch-action:auto;outline-offset:-3px}
 .canvas-frame:not([data-view="2d"]) .map2d{display:none}
-.canvas-frame[data-view="2d"] .scene-webgl,.canvas-frame[data-view="2d"] .scene-labels,.canvas-frame[data-view="2d"] #scene,.canvas-frame[data-view="2d"] .overlay,.canvas-frame[data-view="2d"] .canvas-tip{display:none!important} /* three.js sets an inline display on its canvas */
+.canvas-frame[data-view="2d"] .scene-webgl,.canvas-frame[data-view="2d"] .scene-labels,.canvas-frame[data-view="2d"] #scene{display:none!important} /* three.js sets an inline display on its canvas */
 .no-event{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;padding:var(--s4);text-align:center;color:var(--muted);background:var(--surface-2)}body[data-mode="data-pending"] .no-event{display:flex}
-.overlay{pointer-events:none;position:absolute;left:var(--s3);top:var(--s3);z-index:2;display:flex;gap:var(--s1);flex-wrap:wrap}.pill{padding:3px var(--s2);background:#081625d9;border:1px solid var(--line);border-radius:var(--radius);font:600 11px var(--mono);color:var(--text-2)}
-.canvas-tip{position:absolute;right:var(--s3);bottom:var(--s2);z-index:2;padding:3px var(--s2);border-radius:var(--radius);background:#081625bc;color:var(--muted);font-size:11px;pointer-events:none}
 
 /* Colour bar: same top and bottom margins as the map's plot. */
 .colorbar{flex:none;width:96px;display:grid;grid-template-columns:12px 48px 16px;gap:0 var(--s1);padding:16px 0 40px var(--s2);color:var(--muted)}
@@ -77,8 +76,6 @@ summary{margin:0!important;min-height:24px;line-height:24px;cursor:pointer}detai
 .threshold{display:flex;align-items:center;gap:var(--s2);min-height:32px;margin-top:var(--s1);color:var(--text-2)}.threshold input{width:88px}
 .results{display:grid}.metric{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:var(--s1) 0;border-top:1px solid #1d3046}.metric:first-child{border-top:0}.metric label{flex:none;max-width:48%;font-size:11px;color:var(--muted)}.metric label .dot{width:7px;height:7px;margin-right:var(--s1)}.metric strong{font:600 12px var(--mono);text-align:right;white-space:pre-line;word-break:break-word}.metric strong.good{color:var(--good)}.metric strong.warn{color:var(--warn)}.metric input{width:88px;height:28px}
 .about{color:var(--muted);font-size:12px}.about p{margin:0 0 var(--s2)}.about b{color:var(--text-2);word-break:break-all}
-.slider{margin-top:var(--s2)}.slider label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}.slider b{font:600 11px var(--mono);color:var(--text)}
-.view-buttons{display:grid;grid-template-columns:1fr 1fr;gap:var(--s1);margin-top:var(--s2)}.span2{grid-column:span 2}
 
 /* ---- data visibility and views ---- */
 body:not([data-mode="data"]) .data-only{display:none!important}

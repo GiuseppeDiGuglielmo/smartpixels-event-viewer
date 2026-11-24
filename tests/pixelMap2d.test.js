@@ -95,28 +95,30 @@ function recordingContext() {
   const fills = [];
   const strokes = [];
   const lines = [];
+  const paints = [];
   const ctx = new Proxy({ fillStyle: '', strokeStyle: '', measureText: (s) => ({ width: s.length * 6 }) }, {
     get(target, key) {
       if (key in target) return target[key];
       if (key === 'fillRect') return (x, y, w, h) => fills.push({ style: target.fillStyle, x, y, w, h });
       if (key === 'strokeRect') return () => strokes.push(target.strokeStyle);
       if (key === 'stroke') return () => lines.push(target.strokeStyle);
+      if (key === 'fill') return () => paints.push(target.fillStyle);
       return () => {};
     },
     set(target, key, value) { target[key] = value; return true; },
   });
-  return { ctx, fills, strokes, lines };
+  return { ctx, fills, strokes, lines, paints };
 }
 
 const showAll = { grid: true, traversed: true, top: true, mid: true, exit: true };
 
 function drawWith(extra) {
-  const { ctx, fills, strokes, lines } = recordingContext();
+  const { ctx, fills, strokes, lines, paints } = recordingContext();
   const trace = traceParticle(DEFAULT_STATE);
   drawPixelMap(ctx, 1000, 525, {
     trace, volume: intersectVolume(DEFAULT_STATE), traversed: traversedPixels(DEFAULT_STATE), show: showAll, ...extra,
   });
-  return { fills, strokes, lines, trace };
+  return { fills, strokes, lines, paints, trace };
 }
 
 test('demo mode never paints charge colours; data mode paints exactly the charged pixels', () => {
@@ -326,4 +328,9 @@ test('drag moves the zoomed map with the pointer and stops at the sensor edges',
   const far = mapTransform(panWindow(t, 1e6, -1e6), 900, 900); // content dragged right and up: view at the bottom-left
   close(far.visible.x0, -1200, 1e-6);
   close(far.visible.y0, -1200, 1e-6);
+});
+
+test('the particle is a white circle while moving and gone at the end', () => {
+  assert.equal(drawWith({ progress: 0.5 }).paints.filter((c) => c === '#ffffff').length, 1);
+  assert.equal(drawWith({ progress: 1 }).paints.filter((c) => c === '#ffffff').length, 0);
 });

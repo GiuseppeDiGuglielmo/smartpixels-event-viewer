@@ -227,10 +227,7 @@ export function createRenderer({ canvas, getState }) {
     }
     if (t.hit && s.markMid && t.midHit) circle(mid, 6, '#4f9aff88', '#c6e1ff');
     if (fraction < 0.999) {
-      ctx.shadowColor = '#ffad58';
-      ctx.shadowBlur = 15;
-      circle(moving, 6.5, '#ffc26f', '#ffffff');
-      ctx.shadowBlur = 0;
+      circle(moving, 5, '#ffffff');
     } else if (s.markExit) {
       circle(bottom, 4, '#ffbf8f');
     }

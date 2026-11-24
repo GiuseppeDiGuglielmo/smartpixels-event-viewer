@@ -42,7 +42,7 @@ A user can set (x0,y0,z0) and (thetaX,thetaY) for a single particle.
 
 - Volumetric translucent slab (WebGL) with a 48 × 192 pixel-pad texture and grid on top, midplane, backside, axis triad, and edge index labels.
 - Track origin and direction come from the loaded pixelAV event's truth; only the display start height z₀ is editable.
-- Orbit, pan and zoom camera (OrbitControls), synced with the sliders and keyboard. View presets: top, side X–Z, side Y–Z, focus impact, reset.
+- Orbit, pan and zoom camera (OrbitControls), synced with the toolbar and keyboard. Framing: full sensor or zoom to track. Directions: iso, top, X–Z, Y–Z.
 - Play, pause, loop and seek the particle path. Top impact, midplane crossing and exit markers, with their pixels, appear as the particle reaches each plane.
 - Pixels crossed by the track; label toggle.
 - 2D view (true-aspect top view of the whole array, the default) with highlighted central axes with toggleable markers for the surface, midplane and exit crossings, a hover readout, full-sensor (default) or zoom-to-track framing, and axis labels in µm or pixels from the sensor centre (v0.6.0).

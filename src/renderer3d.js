@@ -23,7 +23,7 @@ const COLORS = Object.freeze({
   slab: 0x4b78a6,
   slabEdge: 0x9cc4e0,
   gridMinor: 0x9fd8f5,
-  gridMajor: 0xb8f0ff,
+  gridAxis: 0xd6eafa,
   mid: 0x4b91f9,
   bottom: 0x22364c,
   particle: 0xffb050,
@@ -37,12 +37,14 @@ const COLORS = Object.freeze({
   outside: 0x8a99a8,
 });
 
+const PARTICLE_RADIUS_PX = 5;
+const BAR_MAX = 4; // scene units (= 400 µm of display height) for the event's largest pixel
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const FACE_NAMES = { top: 'top', bottom: 'bottom', 'x-': 'x− side', 'x+': 'x+ side', 'y-': 'y− side', 'y+': 'y+ side' };
 
 /**
  * Free GPU resources of a rebuilt group. Long-lived shared resources (the
- * pixel texture, glow sprite texture) are passed in `keep` and disposed only
+ * pixel texture) are passed in `keep` and disposed only
  * in dispose(). ArrowHelper shares module-level geometries, so only its
  * materials are released.
  */
@@ -69,24 +71,6 @@ function makeLabel(text, className, center = [0, 1.25]) {
   return label;
 }
 
-function glowTexture() {
-  const size = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, 'rgba(255,240,210,1)');
-  g.addColorStop(0.2, 'rgba(255,190,110,0.85)');
-  g.addColorStop(0.5, 'rgba(255,140,60,0.25)');
-  g.addColorStop(1, 'rgba(255,120,40,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 export function createRenderer3D({ frame, getState, onCameraChange, zoomRange = [0.3, 80] }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
   try {
@@ -104,7 +88,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.domElement.className = 'scene-webgl';
   renderer.domElement.tabIndex = 0;
-  renderer.domElement.setAttribute('aria-label', 'Rotatable 3D WebGL view of the pixel sensor and particle trajectory. Drag to orbit, right-drag or shift-drag to pan, scroll to zoom. Arrow keys orbit, + and − zoom.');
+  renderer.domElement.setAttribute('aria-label', 'Rotatable 3D WebGL view of the pixel sensor and particle trajectory. Drag to rotate, right-drag or shift-drag to move, scroll to zoom. Arrow keys rotate, plus and minus zoom, 0 shows the full sensor, space plays.');
   frame.prepend(renderer.domElement);
 
   const labelRenderer = new CSS2DRenderer();
@@ -144,12 +128,13 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   pixelTexture.generateMipmaps = true;
   pixelTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   pixelTexture.colorSpace = THREE.SRGBColorSpace;
-  const sharedGlow = glowTexture();
-  const keep = new Set([pixelTexture, sharedGlow]);
+  const keep = new Set([pixelTexture]);
 
   let fit = { center: new THREE.Vector3(), distance: 40 };
   let userPanned = false;
   let focused = false;
+  let focusZoom = 1;
+  const focusTarget = new THREE.Vector3();
   let fitKey = '';
   let applyingCamera = false;
   let dirty = true;
@@ -210,18 +195,18 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
 
     if (s.showGrid) {
       const minor = [];
-      const major = [];
+      const axes = []; // the central x = 0 and y = 0 lines
       const h = SENSOR.halfX;
       const k = SENSOR.halfY;
       for (let col = 0; col <= SENSOR.pixelsX; col++) {
         const x = -h + col * SENSOR.pitchX;
-        (col % 16 === 0 ? major : minor).push(...toScene(point(x, -k, 0), st), ...toScene(point(x, k, 0), st));
+        (col === SENSOR.pixelsX / 2 ? axes : minor).push(...toScene(point(x, -k, 0), st), ...toScene(point(x, k, 0), st));
       }
       for (let row = 0; row <= SENSOR.pixelsY; row++) {
         const y = -k + row * SENSOR.pitchY;
-        (row % 16 === 0 ? major : minor).push(...toScene(point(-h, y, 0), st), ...toScene(point(h, y, 0), st));
+        (row === SENSOR.pixelsY / 2 ? axes : minor).push(...toScene(point(-h, y, 0), st), ...toScene(point(h, y, 0), st));
       }
-      for (const [list, color, opacity] of [[minor, COLORS.gridMinor, 0.16], [major, COLORS.gridMajor, 0.5]]) {
+      for (const [list, color, opacity] of [[minor, COLORS.gridMinor, 0.1], [axes, COLORS.gridAxis, 0.9]]) {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(list, 3));
         const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
@@ -229,19 +214,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         lines.renderOrder = 4;
         staticGroup.add(lines);
       }
-      // Pixel-column boundaries every 16 pixels on the two front side faces.
-      const sides = [];
-      for (let col = 0; col <= SENSOR.pixelsX; col += 16) {
-        const x = -h + col * SENSOR.pitchX;
-        sides.push(...toScene(point(x, -k, 0), st), ...toScene(point(x, -k, SENSOR.zBottom), st));
-      }
-      for (let row = 0; row <= SENSOR.pixelsY; row += 16) {
-        const y = -k + row * SENSOR.pitchY;
-        sides.push(...toScene(point(-h, y, 0), st), ...toScene(point(-h, y, SENSOR.zBottom), st));
-      }
-      const sideGeometry = new THREE.BufferGeometry();
-      sideGeometry.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3));
-      staticGroup.add(new THREE.LineSegments(sideGeometry, new THREE.LineBasicMaterial({ color: COLORS.gridMajor, transparent: true, opacity: 0.3 })));
     }
 
     if (s.showMid) {
@@ -265,21 +237,20 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     }
 
     // Axis triad at the (x−, y−) corner, physical directions.
-    const origin = V(point(-SENSOR.halfX - 550, -SENSOR.halfY - 550, 0), st);
-    const axisLength = 4;
+    const origin = V(point(-SENSOR.halfX - 220, -SENSOR.halfY - 220, 0), st);
+    const axisLength = 2.4;
     for (const [name, dir, color] of [
       ['+X', point(1, 0, 0), 0xff9992],
       ['+Y', point(0, 1, 0), 0x9efac3],
       ['+Z', point(0, 0, 1), 0x9bcbfc],
     ]) {
       const d = new THREE.Vector3(...toScene(dir, 1)).normalize();
-      staticGroup.add(new THREE.ArrowHelper(d, origin, axisLength, color, 0.9, 0.45));
-      if (s.showLabels) {
-        const label = makeLabel(name, 'axis', [0.5, 0.5]);
-        label.element.style.color = `#${color.toString(16).padStart(6, '0')}`;
-        label.position.copy(origin).addScaledVector(d, axisLength + 0.9);
-        staticGroup.add(label);
-      }
+      staticGroup.add(new THREE.ArrowHelper(d, origin, axisLength, color, 0.6, 0.3));
+      // Always labelled: the triad is what makes an X/Y transpose visible.
+      const label = makeLabel(name, 'axis', [0.5, 0.5]);
+      label.element.style.color = `#${color.toString(16).padStart(6, '0')}`;
+      label.position.copy(origin).addScaledVector(d, axisLength + 0.55);
+      staticGroup.add(label);
     }
 
     if (s.showLabels) {
@@ -292,9 +263,8 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       };
       add('X · 48 px × 50 µm = 2.4 mm', point(0, -k - 140, 0), 'dim', [0.5, 0]);
       add('Y · 192 px × 12.5 µm = 2.4 mm', point(-h - 140, 0, 0), 'dim', [1, 0.5]);
-      add('col 0', point(-h + 25, -k - 40, 0), 'tick', [0.5, 0]);
+      add('col 0 · row 0', point(-h, -k, 0), 'tick', [0.5, -0.4]);
       add('col 47', point(h - 25, -k - 40, 0), 'tick', [0.5, 0]);
-      add('row 0', point(-h - 40, -k + 6.25, 0), 'tick', [1, 0.5]);
       add('row 191', point(-h - 40, k - 6.25, 0), 'tick', [1, 0.5]);
       add(`100 µm thick · Z display ×${st}`, point(h, -k, SENSOR.zBottom), 'dim', [0, -0.3]);
       if (s.showMid) add('midplane z = −50 µm', point(h, k, SENSOR.zMid), 'mid', [0, 0.5]);
@@ -309,10 +279,9 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     for (let iy = 0; iy < SENSOR.pixelsY; iy++) {
       for (let ix = 0; ix < SENSOR.pixelsX; ix++) {
         const i = iy * SENSOR.pixelsX + ix;
-        const checker = s.showGrid ? ((ix + iy) & 1) : 0;
-        let r = checker ? 70 : 58;
-        let g = checker ? 104 : 92;
-        let b = checker ? 136 : 124;
+        let r = 58;
+        let g = 92;
+        let b = 124;
         let a = 120;
         // pixelAV SIMULATED charge replaces the pad colour (data mode only).
         const q = dataCharge ? dataCharge.dense[i] : 0;
@@ -389,7 +358,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   function buildTrack() {
     const s = state();
     const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showTrackOff, s.showTrackIn,
-      s.showTraversed, s.showLabels, s.showGrid, s.markTop, s.markMid, s.markExit, s.mode, s.charge?.key, s.showChargeBars].join('|');
+      s.showTraversed, s.showGrid, s.markTop, s.markMid, s.markExit, s.mode, s.charge?.key, s.showChargeBars].join('|');
     if (key === trackKey) return false;
     trackKey = key;
     if (trackGroup) { scene.remove(trackGroup); disposeTree(trackGroup, keep); }
@@ -418,11 +387,13 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       beams.push({ ...seg, mesh, a, width: seg.kind === 'in' ? 0.55 : 0.35 });
     }
 
-    const particle = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffe1b0 }));
+    // The particle: a plain white circle, unlit and always on top.
+    const particle = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false, depthWrite: false }),
+    );
     particle.renderOrder = 14;
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sharedGlow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-    glow.renderOrder = 15;
-    trackGroup.add(particle, glow);
+    trackGroup.add(particle);
 
     const startMarker = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: COLORS.particle, transparent: true, opacity: 0.6 }));
     startMarker.position.copy(start);
@@ -447,15 +418,13 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         group.add(cellOutline(c.pixel, c.z, c.color, st));
         if (c.key === 'top') group.add(columnBox(c.pixel, COLORS.top, 0.32, st));
       }
-      if (s.showLabels) {
-        const text = inside
-          ? `${c.title} · px (${c.pixel.x}, ${c.pixel.y})`
-          : `${c.title} · outside sensor`;
-        const center = { top: [-0.1, 1.35], mid: [-0.12, 0.5], exit: [-0.1, -0.4] }[c.key];
-        const label = makeLabel(text, c.key, center);
-        label.position.copy(V(c.p, st));
-        group.add(label);
-      }
+      const text = inside
+        ? `${c.title} · px (${c.pixel.x}, ${c.pixel.y})`
+        : `${c.title} · outside sensor`;
+      const center = { top: [-0.1, 1.35], mid: [-0.12, 0.5], exit: [-0.1, -0.4] }[c.key];
+      const label = makeLabel(text, c.key, center);
+      label.position.copy(V(c.p, st));
+      group.add(label);
       group.visible = false;
       trackGroup.add(group);
       reveal.push({ group, marker: m, progress: progressAtZ(trace, c.z) });
@@ -470,11 +439,9 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         const m = marker(COLORS.side, false);
         m.position.copy(V(p, st));
         group.add(m);
-        if (s.showLabels) {
-          const label = makeLabel(`side ${which} (${FACE_NAMES[face]})${which === 'entry' ? ' · not a top HIT' : ''}`, 'side', [-0.12, 1.25]);
-          label.position.copy(V(p, st));
-          group.add(label);
-        }
+        const label = makeLabel(`side ${which} (${FACE_NAMES[face]})${which === 'entry' ? ' · not a top HIT' : ''}`, 'side', [-0.12, 1.25]);
+        label.position.copy(V(p, st));
+        group.add(label);
         group.visible = false;
         trackGroup.add(group);
         reveal.push({ group, marker: m, progress: progressAtZ(trace, p.z), billboard: true });
@@ -506,7 +473,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       const hits = [];
       for (let p = 0; p < dense.length; p++) if (dense[p] > 0) hits.push(p);
       if (hits.length && scale > 0) {
-        const BAR_MAX = 4; // scene units (= 400 µm of display height) for the event's largest pixel
         const geometry = new THREE.BoxGeometry(SENSOR.pitchX * SCENE_SCALE * 0.86, 1, SENSOR.pitchY * SCENE_SCALE * 0.86);
         geometry.translate(0, 0.5, 0);
         const bars = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.05, transparent: true, opacity: 0.88 }), hits.length);
@@ -524,25 +490,17 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         });
         bars.renderOrder = 6;
         trackGroup.add(bars);
-        if (s.showLabels) {
-          let peak = hits[0];
-          for (const p of hits) if (dense[p] > dense[peak]) peak = p;
-          const c = point(-SENSOR.halfX + ((peak % SENSOR.pixelsX) + 0.5) * SENSOR.pitchX, -SENSOR.halfY + (Math.floor(peak / SENSOR.pixelsX) + 0.5) * SENSOR.pitchY, 0);
-          const label = makeLabel(`pixelAV simulated · max ${Math.round(dense[peak])} e⁻ (slice ${s.charge.slice})`, 'charge', [0.5, 1.2]);
-          label.position.copy(V(c, st)).add(new THREE.Vector3(0, (dense[peak] / scale) * BAR_MAX, 0));
-          trackGroup.add(label);
-        }
       }
     }
 
-    if (s.showLabels && s.showTrackOff) {
+    if (s.showTrackOff) {
       const label = makeLabel(`start (${fmt(trace.start.x)}, ${fmt(trace.start.y)}, ${fmt(trace.start.z)}) µm`, 'start', [-0.1, 1.3]);
       label.position.copy(start);
       trackGroup.add(label);
     }
 
     scene.add(trackGroup);
-    track = { trace, start, end, beams, particle, glow, startMarker, reveal, st };
+    track = { trace, start, end, beams, particle, startMarker, reveal, st };
     return true;
   }
 
@@ -550,7 +508,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
   function updateDynamic() {
     if (!track) return;
     const s = state();
-    const { trace, beams, particle, glow, startMarker, reveal, st } = track;
+    const { trace, beams, particle, startMarker, reveal, st } = track;
     const fraction = s.progress;
     const current = V(pointAtProgress(trace, fraction), st);
     const scale = camera.position.distanceTo(controls.target) * 0.0065;
@@ -560,10 +518,10 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       else b.mesh.visible = false;
     }
     particle.position.copy(current);
-    particle.scale.setScalar(scale * 1.1);
-    glow.position.copy(current);
-    glow.scale.setScalar(scale * 9);
-    particle.visible = glow.visible = fraction < 0.999;
+    // PARTICLE_RADIUS_PX on screen at any zoom, the same size as in the 2D view.
+    const pxToWorld = (2 * camera.position.distanceTo(current) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / height;
+    particle.scale.setScalar(PARTICLE_RADIUS_PX * pxToWorld);
+    particle.visible = fraction < 0.999;
     startMarker.scale.setScalar(scale * 0.8);
 
     for (const r of reveal) {
@@ -589,7 +547,18 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
         for (const z of [SENSOR.zTop, SENSOR.zBottom]) pts.push(V(point(x, y, z)));
       }
     }
-    pts.push(V(trace.start), V(trace.bottom));
+    // Frame what is drawn: the off-sensor path, the charge bars and the axis triad.
+    // Uses the event, not the current slice, so the view holds still during playback.
+    if (s.showTrackOff) pts.push(V(trace.start), V(trace.bottom));
+    if (s.event && s.showChargeBars) pts.push(new THREE.Vector3(0, BAR_MAX, 0));
+    const triad = V(point(-SENSOR.halfX - 220, -SENSOR.halfY - 220, 0));
+    pts.push(triad, triad.clone().add(new THREE.Vector3(0, 3, 0)));
+    return fitPoints(pts, 1.12);
+  }
+
+  /** Camera target and distance that fit the points for the current view direction. */
+  function fitPoints(pts, margin) {
+    const s = state();
     const back = new THREE.Vector3(...toScene(cameraDirection(s.azimuth, s.elevation), 1)).normalize();
     const worldUp = new THREE.Vector3(0, 1, 0); // same as camera.up; elevation ≤ 89° keeps it non-degenerate
     const right = new THREE.Vector3().crossVectors(worldUp, back).normalize();
@@ -607,7 +576,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     const center = new THREE.Vector3().addScaledVector(right, cR).addScaledVector(up, cU).addScaledVector(back, cB);
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     const tanH = tanV * camera.aspect;
-    const margin = 1.12;
     const distance = Math.max(
       ((maxR - minR) / 2) * margin / tanH,
       ((maxU - minU) / 2) * margin / tanV,
@@ -636,6 +604,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     dirty = true;
     if (applyingCamera) return;
     if (controls.target.distanceTo(fit.center) > 1e-6) userPanned = true;
+    if (focused && controls.target.distanceTo(focusTarget) > 1e-3) focused = false; // dragged off the track
     const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
     const physical = fromScene(offset.toArray(), 1);
     const { azimuth, elevation } = anglesFromDirection(physical);
@@ -649,11 +618,32 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     controls.maxDistance = fit.distance / ZOOM_MIN;
   }
 
-  function focusPoint() {
+  /** Close-up on the whole in-silicon track and the event's final charge, bars included. */
+  function applyFocus() {
     const s = state();
     const trace = traceParticle(s);
     const volume = intersectVolume(s);
-    return V(trace.hit ? trace.top : volume ? volume.entry : trace.start);
+    const pts = volume ? [V(volume.entry), V(volume.exit)] : [V(trace.top), V(trace.bottom)];
+    const last = s.event?.slices.at(-1);
+    if (last) {
+      const scale = s.event.scale || 1;
+      for (let i = 0; i < last.indices.length; i++) {
+        if (!(last.charges[i] > 0)) continue;
+        const ix = last.indices[i] % SENSOR.pixelsX;
+        const iy = Math.floor(last.indices[i] / SENSOR.pixelsX);
+        const base = V(point(-SENSOR.halfX + (ix + 0.5) * SENSOR.pitchX, -SENSOR.halfY + (iy + 0.5) * SENSOR.pitchY, 0));
+        pts.push(base);
+        if (s.showChargeBars) pts.push(base.clone().add(new THREE.Vector3(0, (last.charges[i] / scale) * BAR_MAX, 0)));
+      }
+    }
+    const close = fitPoints(pts, 1.25);
+    controls.target.copy(close.center);
+    focusTarget.copy(close.center);
+    s.zoom = THREE.MathUtils.clamp(fit.distance / Math.max(close.distance, 5), ZOOM_MIN, ZOOM_MAX);
+    focusZoom = s.zoom;
+    userPanned = true;
+    focused = true;
+    applyStateCamera();
   }
 
   function refit({ force = false } = {}) {
@@ -664,8 +654,8 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
       userPanned = false;
       focused = false;
     } else if (focused) {
-      // "Focus impact" follows the impact point when the track changes.
-      controls.target.copy(focusPoint());
+      applyFocus(); // "Zoom to track" follows the track when it changes
+      return;
     }
     applyStateCamera();
   }
@@ -686,7 +676,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     buildTrack();
     // Only geometry that changes the framing triggers a refit; overlay toggles do not.
     const s = state();
-    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch].join('|');
+    const key = [s.x0, s.y0, s.z0, s.thetaX, s.thetaY, s.zStretch, s.showTrackOff, s.showChargeBars, s.event?.fileId, s.event?.eventIndex].join('|');
     if (key !== fitKey) {
       fitKey = key;
       refit();
@@ -706,23 +696,25 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     camera.updateProjectionMatrix();
     setFit(userPanned ? { ...fit, distance: computeFit().distance } : computeFit());
     if (!userPanned) controls.target.copy(fit.center);
-    applyStateCamera();
+    if (focused) applyFocus();
+    else applyStateCamera();
   }
 
   function setView(name) {
-    const s = state();
     if (name === 'focus') {
-      controls.target.copy(focusPoint());
-      userPanned = true;
-      focused = true;
-      // ~600 µm across: zoom so the camera sits ~14 scene units away.
-      s.zoom = fit.distance / 14;
-      applyStateCamera();
+      applyFocus();
       return;
     }
     controls.target.copy(fit.center);
     userPanned = false;
     refit({ force: true });
+  }
+
+  /** Which framing button applies now: 'full', 'track', or 'custom' after a free zoom or pan. */
+  function framing() {
+    const s = state();
+    if (focused && Math.abs(s.zoom / focusZoom - 1) < 0.03) return 'track';
+    return !userPanned && Math.abs(s.zoom - 1) < 0.02 ? 'full' : 'custom';
   }
 
   function exportPNG() {
@@ -741,7 +733,6 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     if (staticGroup) disposeTree(staticGroup, keep);
     if (trackGroup) disposeTree(trackGroup, keep);
     pixelTexture.dispose();
-    sharedGlow.dispose();
     renderer.dispose();
     renderer.domElement.remove();
     labelRenderer.domElement.remove();
@@ -770,6 +761,7 @@ function setupScene({ renderer, frame, getState, onCameraChange, zoomRange }) {
     syncCamera: applyStateCamera,
     resetCamera: () => setView('reset'),
     setView,
+    framing,
     exportPNG,
     dispose,
   };

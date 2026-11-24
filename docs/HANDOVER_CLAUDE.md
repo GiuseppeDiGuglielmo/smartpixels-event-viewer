@@ -6,7 +6,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 - how the first two milestones were run with oh-my-claudecode (OMC),
 - how to check the agent's work before trusting it.
 
-## 1. Where the project stands (v0.7.0)
+## 1. Where the project stands (v0.8.0)
 
 | Milestone | Status | Where to read about it |
 |---|---|---|
@@ -16,6 +16,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 | 4. 2D map is the default view (full 48 × 192 array, µm / pixel axes); controls regrouped by view (v0.5.0) | Done | `README.md` ("Layout") |
 | 5. View renamed 2D; central x = 0 / y = 0 axes highlighted; pixel axis counted from the centre (v0.6.0) | Done | `README.md` ("2D view") |
 | 6. One-screen layout: map, colour bar and playback always visible; controls ordered by use; keyboard zoom and pan (v0.7.0) | Done | `README.md` ("Layout") |
+| 7. 3D aligned with 2D: camera in the toolbar, clean default scene, central axes (v0.8.0) | Done | `README.md` ("3D view") |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
 1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
