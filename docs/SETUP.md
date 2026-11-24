@@ -25,7 +25,7 @@ node --version
 ## 2. Get the code and check it
 
 ```bash
-git clone git@github.com:GiuseppeDiGuglielmo/smartpixels-event-viewer.git
+git clone https://github.com/GiuseppeDiGuglielmo/smartpixels-event-viewer.git
 cd smartpixels-event-viewer
 npm test
 ```

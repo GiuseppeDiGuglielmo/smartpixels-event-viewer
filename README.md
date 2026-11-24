@@ -13,7 +13,7 @@ This project **displays** PixelAV output. It does not run or replace PixelAV.
 You need **Node.js 20 or newer** (22 recommended), **git** and a browser with WebGL 2. There is no `npm install` and no build step.
 
 ```bash
-git clone git@github.com:GiuseppeDiGuglielmo/smartpixels-event-viewer.git
+git clone https://github.com/GiuseppeDiGuglielmo/smartpixels-event-viewer.git
 cd smartpixels-event-viewer
 npm test          # optional: checks your setup
 npm run sample    # starts the viewer with 6 example events
