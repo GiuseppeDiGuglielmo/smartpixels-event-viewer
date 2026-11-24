@@ -17,6 +17,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+if (typeof WebSocket === 'undefined') {
+  console.error(`qa-browser needs Node 22 or newer (found ${process.version}).`);
+  process.exit(2);
+}
 const [url = 'http://127.0.0.1:5173/', out = 'qa-out'] = process.argv.slice(2);
 const steps = JSON.parse(process.env.STEPS ?? '[{"wait":2500,"shot":"default"}]');
 const port = Number(process.env.CDP_PORT ?? 9333);

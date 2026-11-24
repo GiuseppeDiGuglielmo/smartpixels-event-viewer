@@ -1,84 +1,73 @@
-# 3D Pixel Sensor / Particle Trajectory Simulator
+# Pixel Sensor Viewer
 
-An interactive browser application for visualizing a charged particle traveling toward and through a **48 × 192 silicon pixel sensor**. The project is based on the earlier custom single-file prototype and the reference sensor-geometry sketch included under `assets/`.
+An interactive browser viewer for how a charged particle crosses a **48 × 192 silicon pixel sensor** (50 × 12.5 µm pixels, 100 µm thick). It shows each event's truth track together with the charge collected per pixel, in 2D and 3D, using **pixelAV simulated** data.
 
-![2D view (default): the whole 48 × 192 array with surface, midplane and exit markers](assets/preview-2d.png)
+![The viewer's 2D view showing one pixelAV event](assets/preview-pixelav.png)
 
-![3D WebGL view](assets/preview-3d.png)
+![The 3D view of the same sensor](assets/preview-3d.png)
 
-![3D view zoomed to the track](assets/preview-3d-focus.png)
+## Quick start
 
-> **Important:** The ray trajectory, plane crossings, volume entry/exit and per-pixel path lengths are **geometric** calculations of a straight line. The only pixel charge shown is **pixelAV simulated** output, loaded from converted events; the earlier illustrative Gaussian (v0.4.0) and geometric demo source were removed.
->
-> The main view is rendered with **Three.js r187 (WebGL)**, vendored under `vendor/three/` (MIT). The original 2D-canvas projection is kept as an automatic fallback when WebGL is unavailable, or on request with `?renderer=2d`. The first screenshot of the old prototype is `assets/preview.png`.
-
-## Get started
-
-Prerequisite: **Node.js 20 or newer** and a WebGL-capable browser. There is **no `npm install`** and no build step: Three.js is vendored as plain ES modules in `vendor/three/` and loaded through an import map in `index.html`, so the app also works **offline** (handy for talks).
+You need **Node.js 20 or newer** (22 recommended), **git** and a browser with WebGL 2. There is no `npm install` and no build step.
 
 ```bash
+git clone <repository-url> pixel-sensor-simulator
 cd pixel-sensor-simulator
+npm test          # optional: checks your setup
+npm run sample    # starts the viewer with 6 example events
+```
+
+Open **http://127.0.0.1:5173/**. Press `Ctrl+C` in the terminal to stop the server.
+
+The example events are real pixelAV events stored in the repository. To browse the full dataset, see **[Use the full dataset](#use-the-full-dataset)**.
+
+## Use the full dataset
+
+The dataset (about 14 GB of Parquet) is not in the repository. Convert it once into a compact format, which needs Python with `pyarrow` and `numpy`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+npm run convert:pixelav -- /path/to/dataset_2su_-9_9_48x192_50x12P5_parquets --jobs 4
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/** in your browser.
+This writes about 1.5 GB to `data/pixelav/` (git-ignored) in roughly 8 minutes. To try it on two files first, use `--split test --limit 2`. **[docs/SETUP.md](docs/SETUP.md)** has the complete steps and troubleshooting.
 
-Run the geometry tests:
+## What you can do
 
-```bash
-npm test
-```
+- **Browse events** one at a time; each is fetched on demand (about 4 KB).
+- **Inspect the charge** in a true-aspect 2D map with zoom, drag and per-pixel hover, or in 3D as bars on the sensor.
+- **Follow time**: play the particle and the 20 charge time slices together, or unlock them with the chain button.
+- **Choose what is drawn**: the trajectory inside and outside the sensor, the surface, midplane and exit crossings, the pixels crossed, and a charge threshold.
+- **Read axes** in µm or in pixels from the sensor centre, and **save** the current view as a PNG.
 
-Open `http://127.0.0.1:5173/?renderer=2d` to force the original 2D-canvas renderer.
+The **[User guide](docs/USER_GUIDE.md)** explains every control.
 
-The original offline prototype is preserved as [`legacy/original-single-file.html`](legacy/original-single-file.html), which can be opened directly without running a server. The modular app uses ES modules, so it **must** be served over HTTP by the dev server instead of opening `index.html` as a `file://` URL.
+## Commands
 
-## pixelAV simulated events
+| Command | What it does |
+|---|---|
+| `npm run sample` | Start the viewer with the 6 example events |
+| `npm run dev` | Start the viewer with converted data from `data/pixelav/` |
+| `npm test` | Run the JavaScript tests (no dataset needed) |
+| `npm run convert:pixelav -- <dir>` | Convert the Parquet dataset (Python) |
+| `npm run test:converter` | Test the converter (Python) |
+| `npm run qa:browser -- <url> <outdir>` | Headless browser check with screenshots (Chrome, Node 22+) |
 
-The viewer can also show **real pixelAV simulated events**: the truth track plus collected charge per pixel, over 20 time slices. To use it:
+## Documentation
 
-1. Convert the Parquet dataset once into a compact sparse format: `npm run convert:pixelav -- <dataset dir>`. This needs Python with pyarrow, for example `conda activate pixelav-env`.
-2. Run `npm run dev` and open the viewer: it loads the first event automatically.
+| Document | For |
+|---|---|
+| [docs/SETUP.md](docs/SETUP.md) | Installing, running, the full dataset, remote machines, troubleshooting |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Using the viewer |
+| [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md) | Data format, memory strategy, coordinate mapping, open conventions |
+| [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) | Detector geometry and requirements |
+| [docs/HANDOVER_CLAUDE.md](docs/HANDOVER_CLAUDE.md) | Continuing development with Claude Code |
 
-The browser then fetches **one event per HTTP Range request** (about 4 KB) and never loads a whole file. pixelAV is the only data source; without converted data the viewer says so and shows no track. See **[docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md)** for the format, the memory strategy, the coordinate mapping, and the origin convention that still needs confirming.
-
-![pixelAV simulated event](assets/preview-pixelav.png)
-
-## What works today
-
-**Layout.** One screen, no page scrolling on desktop. The top bar holds the **2D | 3D** switch and **Save PNG**. The viewport holds its toolbar (framing, axis units, hover readout), the map with a colour bar beside it, and the playback bar. The side panel follows how often things are used: **Event** (file, previous/next/random, charge, pixels and angles at a glance), **Show** (trajectory, crossing points, pixels and the charge threshold), then collapsible **Event details**, **Track** and **About this view**. In 3D, the same toolbar holds framing, camera direction and Z stretch, and **Show** gains a **3D scene** group. On narrow screens everything stacks into one column.
-
-**3D view (Three.js / WebGL; `?view=3d`)**
-
-- Volumetric, translucent 2400 × 2400 × 100 µm silicon slab; top surface carries the 48 × 192 pixel pads (one texel per pixel) and grid lines with the central x = 0 and y = 0 axes highlighted, as in 2D. Backside plane at z = −100 µm and an optional dashed midplane at z = −50 µm.
-- Orientation aids: an always-labelled physical **+X / +Y / +Z** axis triad, plus optional **Dimensions** (`col 0 / col 47`, `row 0 / row 191` and sensor sizes). These make an accidental X/Y transpose easy to spot.
-- **Orbit** (drag), **pan** (right-drag or shift-drag), and **zoom** (wheel or pinch), with damping. Zoom goes down to single 50 × 12.5 µm pixels. The toolbar shows the live azimuth and elevation, and the keyboard works too (arrows rotate, `+`/`−` zoom, `0` full sensor, space plays). Elevation goes to −89°, so you can look at the exit from below.
-- Toolbar: **Full sensor | Zoom to track** (same names as 2D), direction **Iso | Top | X–Z | Y–Z**, and **Z** stretch. A direction keeps a close-up on the track. The camera refits automatically when the trajectory changes, unless you have panned.
-- Animated particle, a plain white circle as in 2D, with a trail. The part of the path inside silicon is drawn brighter. As the particle passes each plane, its marker and the pixel at that crossing appear:
-  - **surface** (z = 0; cyan ring, cell outline, and a translucent 50 × 12.5 × 100 µm pixel column),
-  - **midplane** (z = −50 µm; blue),
-  - **exit** (z = −100 µm; orange).
-  Crossings outside the sensor footprint are drawn grey and labelled “outside sensor”.
-- **Pixels crossed by the track (geometric)**: the pixels that the in-silicon segment passes through, marked with a thin red border so the charge colour stays readable.
-- Side entry/exit through the slab's side faces is marked and labelled separately. It is **never** counted as a top-surface HIT.
-- Loop playback, timeline scrubbing, and **Save PNG** of the 3D scene (the HTML labels are not included in the PNG).
-
-**2D view** (the default)
-
-- A top view of all 48 × 192 pixels at true aspect: the 2.4 × 2.4 mm footprint fills a square plot, so each pixel appears 50 × 12.5 µm. Every pixel boundary is drawn, and the central axes (x = 0 and y = 0 µm) are highlighted. +x right, +y up, zero-based indices.
-- **Axis units**: **µm** (origin at the sensor centre) or **pixels counted from the sensor centre** (x −24 to 24, y −96 to 96, ticks on pixel boundaries). Pixel addresses in labels and readouts stay zero-based (x 0–47, y 0–191). `?units=px` opens the map in pixel units.
-- Optional markers, each toggled on its own, for the **top-surface impact (z = 0)**, the **midplane crossing (z = −50 µm)** and the **exit (z = −100 µm)**. Each marker is a crosshair at the crossing point plus an outline of its pixel and a label such as `surface · px (17, 99)`. Crossings outside the footprint are drawn hollow and labelled "outside sensor". During the animation each marker appears when the particle reaches its plane.
-- The projected track (dashed above the surface, bright inside the silicon), the pixels it crosses and the pixel grid follow the same overlay toggles as the 3D view. Side entry and side exit points are marked separately.
-- **Playback bar**: the **Particle** and **Charge** sliders sit together under the view, joined by a **chain** button. Closed (default): Play, Restart and either slider move particle and charge together, stepping the 20 time slices while the particle crosses the silicon, with no charge before impact. This is a display mapping, not a physical time axis. Open: they move independently, and **Charge vs time** plays the slices alone.
-- **Hide |q| ≤** (under Show → Pixels): pixels with |charge| at or below this value are not drawn, in 2D or 3D, for negative and positive charge alike. Σ q, net charge, max pixel and the colour scale are unchanged, and hovering a hidden pixel still shows its charge.
-- Pixels are coloured by the pixelAV simulated charge of the selected time slice, including negative charge (present in time slices 0–10). The colour bar beside the map shows the event's signed log scale in e⁻: rose for negative, viridis for positive.
-- The area shown is the **Full sensor** (default) or **Zoom to track** (framing the crossings and the charged pixels). The **mouse wheel** zooms about the cursor, from the full sensor down to a single pixel width; either button returns to its framing. When zoomed in, **drag** to move the map; it stops at the sensor's edges. On the focused map, `+`/`−` zoom, arrow keys move, `0` shows the full sensor and space plays. Hover over a pixel to see its index, its position and, in data mode, its charge. **Save PNG** exports the map.
-
-**Readouts and panels**
-
-- **Track crossings**: surface, midplane and exit, each with its position and zero-based `(x, y)` pixel; top-surface **HIT/MISS**; silicon volume entry face → exit face; the 3D chord length in µm and the count of pixel columns crossed.
-
-## Physical geometry (µm)
+## Detector geometry
 
 | Property | Value |
 |---|---:|
@@ -86,87 +75,65 @@ The browser then fetches **one event per HTTP Range request** (about 4 KB) and n
 | Pixels along Y | 192 |
 | X pitch | 50 µm |
 | Y pitch | 12.5 µm |
-| Active width X | 2400 µm (2.4 mm) |
-| Active width Y | 2400 µm (2.4 mm) |
+| Active area | 2400 × 2400 µm |
 | Thickness Z | 100 µm |
 | Top, midplane, bottom | z = 0, −50, −100 µm |
-| Pixel addressing | Zero-based X: 0–47, Y: 0–191 |
+| Pixel addresses | Zero-based, X 0–47, Y 0–191 |
 
-X and Y coordinates are measured relative to the **center of the sensor**: the sensitive footprint is `[-1200, 1200) × [-1200, 1200) µm²`. A particle starts above the sensor (`z0 > 0`) and moves downward toward negative Z.
-
-Direction angles are **two independent slope angles**, not the usual spherical polar/azimuthal angles:
+X and Y are measured from the **centre of the sensor**: the footprint is `[-1200, 1200) × [-1200, 1200) µm²`. A particle starts above the sensor (`z0 > 0`) and moves toward negative Z. Its direction is given by two independent slope angles:
 
 ```text
 x(z) = x0 + (z0 - z) * tan(thetaX)
 y(z) = y0 + (z0 - z) * tan(thetaY)
 ```
 
-The **Z exaggeration** slider affects the picture only, never the geometry or pixel address. In the 3D view it is applied in one place, `src/sceneTransform.js`, which maps physical µm to scene units as `(x, z·stretch, −y)·0.01`. That mapping is a proper rotation with no mirroring, and the tests check it.
+**HIT** means the track crosses the **top surface** inside the footprint. Entry or exit through a side face is reported separately. The 3D **Z** stretch changes the picture only, never the geometry or a pixel address.
 
-**HIT** still means the ray crosses the **top surface** inside the footprint. A separate, tested slab-method function (`intersectVolume`) reports entry and exit through any face, including the sides. The UI shows that result in its own readout row and labels; it does not change HIT.
+## What this is not
+
+- **The charge is pixelAV output.** The viewer does not simulate energy deposition, drift, diffusion, induced signal or noise, and adds no pixel response of its own.
+- **The track is a straight line**, with no magnetic field, multiple scattering, delta rays or energy loss.
+- **Locking the particle to the charge is a display mapping**, not a physical time axis.
+- **Three pixelAV conventions are still open** (origin, readout face and a y offset of about −16 µm). See [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md).
 
 ## Project layout
 
 ```text
 pixel-sensor-simulator/
-├── index.html                       Main UI (+ import map for vendored Three.js)
+├── index.html                Page and import map for the vendored Three.js
 ├── src/
-│   ├── geometry.js                  SOURCE OF TRUTH: constants, ray math, pixel mapping, ROI windows,
-│   │                                volume intersection, traversed pixels (pure JS, no DOM)
-│   ├── sceneTransform.js            Display-only physical→scene mapping, camera angle helpers (pure JS)
-│   ├── renderer3d.js                Three.js volumetric renderer (draws only what geometry.js returns)
-│   ├── renderer.js                  Legacy 2D-canvas renderer (fallback / ?renderer=2d)
-│   ├── pixelMap2d.js                2D top-view pixel map: layout, markers, drawing (pure layout, tested)
-│   ├── pixelav.js                   pixelAV binary decoding + truth→viewer mapping (pure, tested)
-│   ├── eventSource.js               Range-request event loader with LRU caches
-│   ├── dataPanel.js                 Data-source UI: event browser, time slices, event readout
-│   ├── chargeColors.js              Display-only log colour map for simulated charge
-│   ├── presets.js                   Example trajectories used by the geometry tests
-│   ├── main.js                      UI state, controls, animation, renderer selection
-│   └── styles.css                   UI styling
-├── tests/
-│   ├── geometry.test.js             Original geometry regression tests
-│   ├── volume-roi.test.js           ROI, animation, volume intersection, traversal, scene transform
-│   ├── pixelav.test.js              Decoder, mapping and loader on real-event fixture
-│   ├── devserver.test.js            Range parsing, path safety
-│   ├── chargeColors.test.js         Colour map
-│   ├── pixelMap2d.test.js           2D map layout, picking, markers, label placement
-│   └── fixtures/pixelav/            6 real events written by the converter test
-├── vendor/three/                    Three.js r187 (MIT), unmodified: core, OrbitControls, CSS2DRenderer
-├── scripts/dev-server.mjs           Dependency-free streaming HTTP server (Range/206, /data/pixelav mount)
-├── scripts/pixelav_convert.py       Parquet → sparse event converter (pyarrow, bounded memory)
-├── scripts/test_pixelav_convert.py  Converter tests (+ bit-exact check vs real data)
-├── scripts/qa-browser.mjs           Headless-Chrome UI check over DevTools (npm run qa:browser)
-├── data/pixelav/                    Converted events (git-ignored; created by the converter)
-├── assets/                          Reference drawing and screenshots
-├── docs/                            PROJECT_SPEC.md, PIXELAV_DATA.md, HANDOVER_CLAUDE.md, CLAUDE_START_PROMPT.md (historical)
-├── legacy/original-single-file.html Working offline original prototype
-├── CLAUDE.md                        Instructions for Claude Code
-└── package.json
+│   ├── geometry.js           Source of truth: constants, track math, pixel mapping (no DOM)
+│   ├── sceneTransform.js     Physical → 3D scene mapping and camera presets
+│   ├── pixelMap2d.js         2D view: layout, axes, markers, drawing
+│   ├── renderer3d.js         3D view (Three.js)
+│   ├── renderer.js           Fallback canvas renderer (no WebGL, or ?renderer=2d)
+│   ├── pixelav.js            pixelAV decoding, truth mapping, charge statistics
+│   ├── eventSource.js        One-event-at-a-time loader (HTTP Range, LRU caches)
+│   ├── dataPanel.js          Event browser, time slices, readouts
+│   ├── chargeColors.js       Signed log colour scale
+│   ├── presets.js            Example tracks used by the tests
+│   ├── main.js               UI state, controls, animation
+│   └── styles.css            Styling and design tokens
+├── scripts/
+│   ├── dev-server.mjs        Dependency-free server with HTTP Range support
+│   ├── pixelav_convert.py    Parquet → sparse event converter
+│   ├── test_pixelav_convert.py
+│   └── qa-browser.mjs        Headless browser check
+├── tests/                    Node tests and 6 real example events (fixtures/pixelav)
+├── vendor/three/             Three.js r187 (MIT), unmodified
+├── docs/                     Documentation
+├── assets/                   Screenshots and the reference drawing
+├── legacy/                   Original single-file prototype
+├── requirements.txt          Python packages for the converter
+└── CLAUDE.md                 Project rules for Claude Code
 ```
 
-### Upgrading Three.js
+## Development
 
-The vendored files are copied verbatim from the npm package (`npm pack three@<version>`): `build/three.module.js`, `build/three.core.js`, `examples/jsm/controls/OrbitControls.js` → `addons/controls/`, and `examples/jsm/renderers/CSS2DRenderer.js` → `addons/renderers/`. Replace all four together, then update `vendor/three/README.txt`.
+Run `npm test` after every change; a change that only alters screenshots does not validate the geometry. Project rules, including the detector constants and axis conventions, are in [CLAUDE.md](CLAUDE.md). Do not add a made-up pixel response, and do not change the detector dimensions or axis conventions without updating the specification and tests.
 
-## Continue development in Claude Code
+**Upgrading Three.js:** The vendored files are copied verbatim from the npm package (`npm pack three@<version>`): `build/three.module.js`, `build/three.core.js`, `examples/jsm/controls/OrbitControls.js` → `addons/controls/`, and `examples/jsm/renderers/CSS2DRenderer.js` → `addons/renderers/`. Replace all four together, then update `vendor/three/README.txt`.
 
-Start Claude Code in the project folder (`claude`). It picks up `CLAUDE.md`, which holds the project rules, automatically.
+## License
 
-**Taking over the project?** Read **[`docs/HANDOVER_CLAUDE.md`](docs/HANDOVER_CLAUDE.md)**. It covers the current state, the open decisions, how to use oh-my-claudecode (the `autopilot` workflow that built milestones 1 and 2), and how to verify an agent's changes, including a headless browser check (`npm run qa:browser`). `docs/CLAUDE_START_PROMPT.md` is the original milestone-1 prompt and is kept for history only.
-
-## Still illustrative or not yet implemented
-
-- The only charge shown anywhere is pixelAV simulated charge.
-- No energy deposition, electron–hole pair generation, drift, diffusion, induced signal, threshold or noise. Per-pixel path lengths are pure geometry and are **not** a proxy for collected charge.
-- Straight line only: no magnetic field, multiple scattering, delta rays, or energy loss.
-- The display Z stretch distorts the visual angle of the track. Use ×1 to see true proportions.
-
-## Suggested future improvements
-
-1. *Partly done (v0.4.0):* hovering over a pixel in the 2D view shows its index, position and charge. Still open: path length, and picking in the 3D view.
-2. *Done (v0.3.0):* pixelAV events. Still open: filtering and sorting events by truth (cotα, cotβ, pT), and drawing the charge along depth (z) when per-depth data is available.
-3. Show several tracks per event and step through event sequences.
-4. Export annotated images, including labels, and video frames for talks.
-
-Do **not** add a made-up pixel response presented as charge, and do **not** change the detector dimensions or axis conventions without updating the specification and tests.
+[MIT](LICENSE). Three.js is also MIT licensed.

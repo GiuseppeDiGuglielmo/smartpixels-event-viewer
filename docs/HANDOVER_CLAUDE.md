@@ -6,7 +6,7 @@ This page is for whoever continues this project with an AI coding agent. It cove
 - how the first two milestones were run with oh-my-claudecode (OMC),
 - how to check the agent's work before trusting it.
 
-## 1. Where the project stands (v0.8.0)
+## 1. Where the project stands (v0.9.0)
 
 | Milestone | Status | Where to read about it |
 |---|---|---|
@@ -16,26 +16,27 @@ This page is for whoever continues this project with an AI coding agent. It cove
 | 4. 2D map is the default view (full 48 × 192 array, µm / pixel axes); controls regrouped by view (v0.5.0) | Done | `README.md` ("Layout") |
 | 5. View renamed 2D; central x = 0 / y = 0 axes highlighted; pixel axis counted from the centre (v0.6.0) | Done | `README.md` ("2D view") |
 | 6. One-screen layout: map, colour bar and playback always visible; controls ordered by use; keyboard zoom and pan (v0.7.0) | Done | `README.md` ("Layout") |
-| 7. 3D aligned with 2D: camera in the toolbar, clean default scene, central axes (v0.8.0) | Done | `README.md` ("3D view") |
+| 7. 3D aligned with 2D: camera in the toolbar, clean default scene, central axes (v0.8.0) | Done | `docs/USER_GUIDE.md` |
+| 8. Clone-and-run docs, `npm run sample`, `requirements.txt` (v0.9.0) | Done | `docs/SETUP.md` |
 
 **Open decisions (need a human, ideally the dataset's author).** Details and evidence are in `.omc/autopilot/decisions-pending.md` and `docs/PIXELAV_DATA.md`.
 1. pixelAV `(x, y) = (0, 0)` is assumed to be the centre of pixel (23, 95). This is `PIXELAV_ORIGIN` in `src/pixelav.js`.
 2. Readout pixels are assumed to sit on the track's entry face (pixelAV z = 100, viewer z = 0).
 3. A constant ≈ −16 µm y residual (probably Lorentz drift) is shown, not corrected.
 
-Candidate next tasks are listed under "Suggested future improvements" in `README.md`.
+Candidate next tasks: event filtering by truth (cotα, cotβ, pT), negative charge in the 3D bars, picking pixels in 3D, and exporting video frames for talks.
 
 ## 2. What you need
 
 | Tool | Needed for |
 |---|---|
-| Node ≥ 20 | Everything: `npm test`, `npm run dev`. There are no npm packages; Three.js is vendored. |
-| Python ≥ 3.9 with `pyarrow` and `numpy` (e.g. a conda env) | Only for converting Parquet: `npm run convert:pixelav` |
+| Node ≥ 20 (22 recommended; `.nvmrc`) | Everything: `npm test`, `npm run dev`. There are no npm packages; Three.js is vendored. `qa:browser` needs Node 22. |
+| Python ≥ 3.9 with `requirements.txt` | Only for converting Parquet: `npm run convert:pixelav` |
 | `google-chrome` | Only for headless UI checks: `scripts/qa-browser.mjs` |
 | Claude Code | The agent. Run `claude` in this folder. |
 | oh-my-claudecode | Optional. Adds a multi-agent workflow on top of Claude Code (§4). |
 
-The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the project folder handed over; it is git-ignored. Regenerate it from the source Parquet files, about 8 min with `--jobs 4` (see `docs/PIXELAV_DATA.md`). Without it, the viewer says no data is available and shows no track. `npm test` still passes, because it uses the small real-data fixture in `tests/fixtures/pixelav/`.
+The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the project folder handed over; it is git-ignored. Regenerate it from the source Parquet files, about 8 min with `--jobs 4` (see `docs/PIXELAV_DATA.md`). Without it, `npm run sample` serves 6 real events; plain `npm run dev` says no data is available and shows no track. `npm test` still passes, because it uses the small real-data fixture in `tests/fixtures/pixelav/`.
 
 ## 3. What Claude reads automatically
 

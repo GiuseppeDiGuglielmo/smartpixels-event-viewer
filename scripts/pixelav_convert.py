@@ -30,7 +30,7 @@ Output (<out>/manifest.json, and per source file <out>/<split>/<stem>.*):
                          u16[count] pixel index p = iy*48 + ix  (+ u16 pad if count is odd)
                          f32[count] charge (electrons, cumulative in time)
 
-Usage (conda env with pyarrow, e.g. `conda activate pixelav-env`):
+Usage (Python with pyarrow and numpy, see requirements.txt):
   python scripts/pixelav_convert.py SRC_DIR [--out data/pixelav] [--split test]
          [--limit 2] [--files test/part.0.parquet ...] [--jobs 1] [--chunk-cols 2304]
 """

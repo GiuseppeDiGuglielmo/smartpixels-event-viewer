@@ -15,7 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, extname, resolve, sep } from 'node:path';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dataRoot = resolve(process.env.PIXELAV_DATA ?? resolve(projectRoot, 'data', 'pixelav'));
+// --sample serves the 6 real events kept in the repository, so a fresh clone works without the dataset.
+const defaultData = process.argv.includes('--sample')
+  ? resolve(projectRoot, 'tests', 'fixtures', 'pixelav')
+  : resolve(projectRoot, 'data', 'pixelav');
+const dataRoot = resolve(process.env.PIXELAV_DATA ?? defaultData);
 const DATA_PREFIX = '/data/pixelav/';
 const port = Number.parseInt(process.env.PORT ?? '5173', 10);
 const host = process.env.HOST ?? '127.0.0.1';

@@ -179,7 +179,7 @@ export function createDataPanel({ state, el, update, stopParticle, dataUrl = './
       update();
     } catch (error) {
       if (token !== loadToken) return;
-      const hint = stage === 'source' ? ' — convert data first: see docs/PIXELAV_DATA.md' : '';
+      const hint = stage === 'source' ? ' Run `npm run sample` for 6 example events, or see docs/SETUP.md to convert the dataset.' : '';
       setStatus(`${error.message}${hint}`, 'error');
       update();
     }

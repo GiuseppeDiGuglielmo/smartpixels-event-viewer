@@ -28,9 +28,10 @@ You are working in an interactive **particle-to-pixel silicon detector visualiza
 - `src/renderer3d.js`: Three.js (WebGL) renderer; draws only what geometry.js returns.
 - `src/renderer.js`: legacy 2D-canvas renderer (fallback, `?renderer=2d`); keep physical coordinates distinct from projected coordinates.
 - `src/pixelMap2d.js`: 2D top-view pixel map (the default view; `?view=3d` for 3D): pure layout/marker/label/axis-tick helpers plus canvas drawing. Tested in `tests/pixelMap2d.test.js`.
+- `docs/SETUP.md`, `docs/USER_GUIDE.md`: install and usage docs. Update them when commands or controls change.
 - `index.html` UI rule: controls that apply to one view carry `view-2d` / `view-3d` and are hidden in the other view; one name and colour per concept (Surface z = 0, Midplane z = −50 µm, Exit z = −100 µm) across toggles, legend, labels and readout.
 - `src/pixelav.js`, `src/eventSource.js`, `src/dataPanel.js`: pixelAV simulated-event mode (decoder + mapping, Range loader, UI). Charge colours come only from loaded simulated events (`pixelShading`).
-- `scripts/pixelav_convert.py`: Parquet → sparse converter (Python + pyarrow, e.g. conda env `pixelav-env`). Format and conventions: `docs/PIXELAV_DATA.md`.
+- `scripts/pixelav_convert.py`: Parquet → sparse converter (Python + pyarrow, see `requirements.txt`). Format and conventions: `docs/PIXELAV_DATA.md`.
 - `vendor/three/`: unmodified Three.js r187 (MIT), loaded via the import map in index.html. No npm install.
 - `src/main.js`: UI state, input validation, animation, interaction.
 - `tests/*.test.js`: regression tests. Add tests for any new geometry or hit logic.

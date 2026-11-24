@@ -7,4 +7,5 @@ dist/
 data/
 .omc/state/
 __pycache__/
+.venv/
 *.pyc

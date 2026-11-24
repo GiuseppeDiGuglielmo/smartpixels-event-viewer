@@ -6,17 +6,18 @@ The viewer shows real **pixelAV simulated** events:
 - the charge's evolution over the 20 time slices,
 - a 2D top-view pixel map of the charge, with markers for the surface impact, midplane crossing and exit.
 
-Source dataset used during development:
+Source dataset used during development (not in this repository):
 
 ```
-/path/to/
-  dataset_2su_-9_9_48x192_50x12P5_parquets/{test,train}/part.N.parquet   (100 files, 14 GB)
+dataset_2su_-9_9_48x192_50x12P5_parquets/{test,train}/part.N.parquet   (100 files, 14 GB)
 ```
+
+To try the viewer without it, run `npm run sample`, which serves 6 real events from `tests/fixtures/pixelav/`. Installation steps are in [SETUP.md](SETUP.md).
 
 ## Quick start
 
 ```bash
-conda activate pixelav-env                      # any Python ≥ 3.9 with pyarrow + numpy
+source .venv/bin/activate                    # any Python ≥ 3.9 with pyarrow + numpy (see SETUP.md)
 # convert a couple of files first (≈ 15 s and ≈ 1 GB RAM per file):
 npm run convert:pixelav -- /path/to/dataset_2su_-9_9_48x192_50x12P5_parquets --split test --limit 2
 # or everything (≈ 1.5 GB output; --jobs N uses ≈ 1 GB RAM per worker):
@@ -25,7 +26,7 @@ npm run dev                                  # serves ./data/pixelav at /data/pi
 ```
 
 Open http://127.0.0.1:5173/; the first event loads automatically.
-You can also link straight to an event: `http://127.0.0.1:5173/?mode=data&file=0&event=42`.
+You can also link straight to an event: `http://127.0.0.1:5173/?file=test/part.0&event=42`.
 
 The converter writes to `data/pixelav/` by default (git-ignored). It is incremental: unchanged files are skipped.
 - To write elsewhere, use `--out DIR`.

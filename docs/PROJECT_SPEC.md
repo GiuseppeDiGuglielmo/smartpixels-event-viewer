@@ -70,5 +70,5 @@ No actual particle/material interaction is simulated. The line is straight, with
 - `npm run dev` serves the UI locally with no dependency installation.
 - Starting point and angles visibly change the trajectory and numeric intercept readouts.
 - Edge handling honors the half-open footprint, and a miss has no pixel address.
-- The panel layout and controls stay those of `assets/preview.png`; the 3D view looks like `assets/preview-3d.png`.
+- The current layout is shown in `assets/preview-pixelav.png` (2D) and `assets/preview-3d.png` (3D); controls are described in `docs/USER_GUIDE.md`.
 - No user-visible feature claims non-existent physical accuracy.
