@@ -67,7 +67,9 @@ The **[User guide](docs/USER_GUIDE.md)** explains every control.
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Using the viewer |
 | [docs/PIXELAV_DATA.md](docs/PIXELAV_DATA.md) | Data format, memory strategy, coordinate mapping, open conventions |
 | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) | Detector geometry and requirements |
-| [docs/HANDOVER_CLAUDE.md](docs/HANDOVER_CLAUDE.md) | Continuing development with Claude Code |
+| [docs/OPEN_DECISIONS.md](docs/OPEN_DECISIONS.md) | Physics conventions that still need confirming |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [docs/HANDOVER_CLAUDE.md](docs/HANDOVER_CLAUDE.md) | Developing with Claude Code and, optionally, oh-my-claudecode |
 
 ## Detector geometry
 
@@ -130,7 +132,9 @@ smartpixels-event-viewer/
 └── CLAUDE.md                 Project rules for Claude Code
 ```
 
-## Development
+## Contributing
+
+Contributions are welcome, with or without AI coding agents. Start with **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 Run `npm test` after every change; a change that only alters screenshots does not validate the geometry. Project rules, including the detector constants and axis conventions, are in [CLAUDE.md](CLAUDE.md). Do not add a made-up pixel response, and do not change the detector dimensions or axis conventions without updating the specification and tests.
 

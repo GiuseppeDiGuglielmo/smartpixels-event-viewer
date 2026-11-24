@@ -5,7 +5,11 @@ coverage/
 dist/
 *.log
 data/
-.omc/state/
+# Personal AI-agent state: each contributor sets up their own tools.
+.omc/
+.claude/CLAUDE.md
+.claude/skills/wiki/
+.claude/settings.local.json
 __pycache__/
 .venv/
 *.pyc

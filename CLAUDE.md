@@ -43,6 +43,7 @@ You are working in **SmartPixels Event Viewer**, an interactive **particle-to-pi
 - Prefer incremental, working changes with a short explanation of what changed.
 - If migrating to Three.js, keep `src/geometry.js` and tests. Explicitly document the rendering dependency and update the run instructions.
 - Support Linux and local development with minimal setup; the current app uses Node 20+ and no npm packages (Three.js is vendored).
+- Do not commit personal agent state (`.omc/`, `.claude/CLAUDE.md`), datasets or credentials. Contribution rules are in `CONTRIBUTING.md`; unresolved physics conventions are in `docs/OPEN_DECISIONS.md`.
 - Run `npm test` after edits. A change that only alters screenshots does not validate correct detector geometry.
 - Prioritize a polished, accurate, interactive visualization for talks and demos.
 

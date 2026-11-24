@@ -27,7 +27,7 @@ export const DATA_MODE_DEFAULT_Z0 = 150;
  * pixel (23, 95). With this choice the charge centroid matches the truth
  * midplane in x (≈0 µm); a constant ≈ −16 µm shift remains in y, which is
  * NOT removed (plausibly Lorentz drift). PENDING confirmation with the dataset
- * author — see .omc/autopilot/decisions-pending.md and docs/PIXELAV_DATA.md.
+ * author — see docs/OPEN_DECISIONS.md and docs/PIXELAV_DATA.md.
  */
 export const PIXELAV_ORIGIN = Object.freeze(pixelCenter(23, 95));
 
