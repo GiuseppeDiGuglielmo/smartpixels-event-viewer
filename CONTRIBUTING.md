@@ -48,7 +48,7 @@ These keep the viewer scientifically honest. The full list is in [CLAUDE.md](CLA
 
 ## Using AI coding agents
 
-Agents are welcome, including Claude Code and [oh-my-claudecode](docs/HANDOVER_CLAUDE.md#4-oh-my-claudecode-omc-optional). OMC is optional and set up per person.
+Agents are welcome, including Claude Code and [oh-my-claudecode](docs/HANDOVER_CLAUDE.md#4-oh-my-claudecode-omc-optional). OMC ([ohmyclaudecode.com](https://ohmyclaudecode.com/)) is optional and set up per person.
 
 - `CLAUDE.md` holds the shared rules that agents read automatically.
 - **Do not commit personal agent state** such as `.omc/` or a generated `.claude/CLAUDE.md`. These are git-ignored.

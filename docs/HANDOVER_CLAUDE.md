@@ -36,7 +36,7 @@ Candidate next tasks: event filtering by truth (cotα, cotβ, pT), negative char
 | Python ≥ 3.9 with `requirements.txt` | Only for converting Parquet: `npm run convert:pixelav` |
 | `google-chrome` | Only for headless UI checks: `scripts/qa-browser.mjs` |
 | Claude Code | The agent. Run `claude` in this folder. |
-| oh-my-claudecode | Optional. Adds a multi-agent workflow on top of Claude Code (§4). |
+| [oh-my-claudecode](https://ohmyclaudecode.com/) | Optional. Adds a multi-agent workflow on top of Claude Code (§4). |
 
 The converted data (`data/pixelav/`, about 1.5 GB) is **not** part of the project folder handed over; it is git-ignored. Regenerate it from the source Parquet files, about 8 min with `--jobs 4` (see `docs/PIXELAV_DATA.md`). Without it, `npm run sample` serves 6 real events; plain `npm run dev` says no data is available and shows no track. `npm test` still passes, because it uses the small real-data fixture in `tests/fixtures/pixelav/`.
 
@@ -55,7 +55,7 @@ Plain Claude Code needs nothing beyond the shared `CLAUDE.md`.
 
 OMC is a Claude Code plugin. It adds workflow skills such as `autopilot`, `plan`, `review` and `verify`, plus specialist subagents. Much of this project was built with its **`autopilot`** workflow: spec, plan, implementation, test and QA loop, independent reviews, closeout.
 
-**Nothing in this repository depends on OMC, and its setup is per person.** Install it by following the OMC project's README, then set it up for this checkout with `/oh-my-claudecode:omc-setup --local`. Avoid its global overwrite mode if you keep your own `~/.claude/CLAUDE.md`.
+**Nothing in this repository depends on OMC, and its setup is per person.** Install it by following the instructions at [ohmyclaudecode.com](https://ohmyclaudecode.com/), then set it up for this checkout with `/oh-my-claudecode:omc-setup --local`. Avoid its global overwrite mode if you keep your own `~/.claude/CLAUDE.md`.
 
 ### Keep it opt-in (optional)
 
